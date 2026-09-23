@@ -1,0 +1,13 @@
+1. Every student is expected to register with the library, after registration the students are given a library card which has the registration number, faculty and department, and also 3 borrow card which are used to borrow books from the library
+
+
+2. A student can only borrow 3 books at a time and post graduate students are given 5
+
+
+3. If a student wants to borrow a book he picks it up goes to the librarian on duty
+
+4. Every book has a call number which is the number of the book and an ascension number
+
+5. So if a student borrows a book he drops one borrow card along with his library card on the library card the borrow and return date are written on it, every book has a deadline of 2 weeks to be returned and 1 month for post graduate students, the cards are not returned to the student until he returns the book
+
+6. Our supervisor said we should send him the requirement analysis for the system
