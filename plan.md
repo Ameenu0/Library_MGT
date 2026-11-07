@@ -62,12 +62,23 @@ To design and implement a functional library management system that allows stude
 ## 4. Proposed System Architecture
 
 ### Current Project Status
-The environment setup stage has been completed and verified. The project currently contains a working React frontend scaffold and a Node.js backend server that starts successfully.
+The project has moved beyond environment setup. The frontend and backend are both working, and the core library workflows have been implemented and verified. The current build includes a role-based admin flow, librarian management screens, and student-facing borrowing logic with approval and return tracking.
+
+### Latest Implementation Progress (2026-10-15)
+- The default route is the login page, and users are not kept signed in after refresh unless the app state is explicitly restored.
+- Separate admin routes were implemented so admin pages do not fall through to librarian screens.
+- The admin panel is restricted to the requested modules: Library Inventory, Transaction History, and Overdue Books.
+- The admin inventory section allows adding books while also supporting catalog search.
+- The admin dashboard now includes student search by registration number or name, without allowing student registration from the admin view.
+- Student search results show borrowed-but-not-returned books and overdue loans, or a "none of this" message when there are no issues.
+- Book availability is displayed as "Not available" when a book has been requested, approved, or otherwise cannot be borrowed.
+- The request workflow remains protected by librarian approval before a book is formally issued.
+- Frontend build verification has been completed successfully with Vite.
 
 ### Technology Stack
 - Frontend: React.js
 - Backend: Node.js with Express.js
-- Database: MongoDB (recommended for fast development and flexible data models) or PostgreSQL if relational structure is preferred
+- Database: SQLite for this project, with PostgreSQL as the recommended upgrade path for larger production deployments
 - Authentication: JWT-based authentication
 - Styling: CSS, Tailwind CSS, or Bootstrap
 - Version control: Git and GitHub
@@ -82,38 +93,111 @@ The environment setup stage has been completed and verified. The project current
 
 ---
 
-## 5. Functional Requirements
+## 5. Main Functional Requirements
 
-### Student Module
-- Student can register with personal details and academic information
-- Student receives a unique library card
-- Student can view borrowing records
-- Student can borrow books subject to limits
-- Student can return books when due
-- Student can view due dates and overdues
+The current system is designed around three main actors: student, librarian, and admin. The application supports a role-based workflow in which users log in from the same entry screen but are routed to the correct dashboard according to their role.
 
-### Librarian Module
-- Librarian can register students
-- Librarian can create and manage book records
-- Librarian can issue borrow cards and library cards
-- Librarian can accept borrow requests
-- Librarian can verify returned books
-- Librarian can track late returns and overdue records
-- Librarian can generate reports
+### Student Functional Requirements
+- A student must be able to log in using their registration number or email and password.
+- A first-time student must be able to activate their account by creating a password using their registration number, new password, and confirm password.
+- The student must be able to view their dashboard with active borrowing information, due dates, and loan status.
+- The student must be able to request a book for borrowing.
+- The system must prevent a student from borrowing more than the allowed maximum number of books.
+- The student must be able to see whether a requested book is available or unavailable.
+- The student should be able to return books and view updated borrowing records on their dashboard.
+- The student must be able to access only their own information and borrowing data.
+- The system must enforce correct validation for password creation, including matching passwords and minimum password length.
 
-### Book Module
-- Each book has title, author, accession number, and call number
-- Books can be added, updated, and searched
-- Availability status is tracked
+### Librarian Functional Requirements
+- The librarian must be able to log in and access the librarian dashboard.
+- The librarian must be able to register or manage student records.
+- The librarian must be able to approve or reject student borrow requests.
+- The librarian must be able to view students with borrowed books and overdue records.
+- The librarian must be able to search students by registration number or name.
+- The librarian must be able to search books and view availability.
+- The librarian must be able to manage library inventory and book records.
+- The librarian must be able to track borrowing and return transactions.
+- The librarian must be able to identify whether a student has any books not returned and whether any loans are overdue.
 
-### Borrowing and Return Module
-- Student submits a book request before borrowing begins
-- Librarian reviews and approves the request before issuing the book
-- Borrow record is created only after librarian approval
-- Return date is calculated according to student category
-- Borrow cards are held until the student returns the book
-- Overdue conditions are flagged if returned after the due date
-- Book is issued to the student only after successful approval
+### Admin Functional Requirements
+- The admin must be able to log in and access the admin dashboard.
+- The admin must be able to view library overview statistics and operational summaries.
+- The admin must be able to manage library inventory.
+- The admin must be able to view transaction history.
+- The admin must be able to view overdue books and loan issues.
+- The admin must be able to search for students but must not be allowed to register students.
+- The admin must only access the permitted modules and not the full librarian workflow.
+
+### Book and Borrowing Functional Requirements
+- Each book must include a title, author, accession number, and call number.
+- Books must be marked as available or unavailable based on current state.
+- A student request must be stored only after validation and must not be silently lost.
+- A student cannot borrow a book until the librarian approves the request.
+- Loan due dates must be calculated according to the student’s category.
+- A student with overdue books must be flagged clearly in the system.
+- Returned books must update availability and clear the active loan from the student’s dashboard.
+- Requests for unavailable books must show the correct status as "Not available" rather than a misleading request state.
+
+### Authentication and Security Requirements
+- The system must route users by role after login.
+- The default login page must be the default entry point.
+- The app must clear stale data from the login and activation forms so that users always begin with blank fields.
+- Student accounts must support self-service password activation rather than automatic default password generation.
+- The system must prevent unauthorized access to dashboards and restrict navigation according to role.
+
+---
+
+## 6. Development Approach
+
+The system was developed using an iterative, role-based approach that started with the core business rules and then moved to implementation, validation, and cleanup.
+
+### Approach Used
+1. Requirement analysis and business-rule mapping.
+   - The project began by identifying the library workflows, roles, and approval rules needed for students, librarians, and admin staff.
+
+2. Modular system design.
+   - The application was separated into a React frontend for user interfaces and an Express backend for business logic and data storage.
+   - Role-based routes were created so the same app could serve student, librarian, and admin screens cleanly.
+
+3. Database and API layer design.
+   - SQLite was used for persistent storage of students, books, requests, and borrowing records.
+   - REST endpoints were created for login, activation, borrowing, approvals, returns, searches, and overview reporting.
+
+4. Validation-first implementation.
+   - Business rules such as borrowing limits, due dates, duplicate request prevention, and overdue checks were enforced in the backend.
+   - Frontend validation was also added for activation and login flows.
+
+5. UX refinement and bug cleanup.
+   - The interface was refined to remove stale form values, reduce confusion in role switching, and keep activation and login flows simple and consistent.
+   - The admin and librarian screens were cleaned so only relevant navigation links and modules remained visible.
+
+6. Verification and testing.
+   - Production build checks were executed for the frontend.
+   - Backend tests were used to validate request handling, stock logic, and student activation rules.
+
+This approach made it possible to build a practical library management system that matches the actual operational workflow rather than only a conceptual design.
+
+---
+
+## 7. System Workflow
+
+The library system works as follows:
+
+1. User opens the application and lands on the login page.
+2. The user enters their registration number or email and password.
+3. The server checks the role and redirects the user to the proper dashboard.
+4. If the user is a first-time student, they use the “Activate your account” flow to set a password.
+5. The student logs in and sees their dashboard with active loans, due dates, and borrowing status.
+6. The student submits a borrow request for a book.
+7. The request is saved and the system marks the book as unavailable or pending according to the request state.
+8. The librarian reviews the request on the librarian dashboard.
+9. The librarian approves the book request before the borrow is officially processed.
+10. Once approved, the due date is calculated and the book is assigned to the student.
+11. The student can return the book when due, after which the system updates the record and restores availability.
+12. The librarian and admin can search for students and books, check overdue records, and review system history.
+13. The admin can see high-level summaries and manage the inventory without being allowed to perform student registration.
+
+This workflow ensures that the library process is controlled, visible, and auditable from both the student and staff side.
 
 ---
 
@@ -134,18 +218,26 @@ The environment setup stage has been completed and verified. The project current
 ### Actors
 - Student
 - Librarian
-- Administrator (optional if required)
+- Administrator
 
 ### Main Use Cases
 - Register student
+- Student login to personal dashboard
+- View active loans and return due dates
+- View borrowing history and outstanding obligations
 - Issue library card
 - Issue borrow card
-- Borrow a book
+- Borrow a book through a request workflow
+- Librarian approve the borrowing request
 - Return a book
 - View transaction history
 - Search for a book
 - Manage library inventory
 - View overdue books
+- Administrator login to the administration panel
+- Administrator review high-level system metrics and active reports
+- Administrator view active requests, loan counts, and overdue summaries
+- Administrator monitor the library without disrupting student or librarian workflows
 
 ---
 
@@ -232,53 +324,88 @@ Verification evidence:
 
 ### Phase 3: Database and Backend Design
 
-Status: Achieved for the Week 3 request/approval milestone
+Status: Achieved and Verified
 
 1. Define the database schema for students, books, cards, and borrow records. ✅
-2. Set up MongoDB connection (or PostgreSQL if chosen). ✅ (project is prepared for future integration; current prototype uses in-memory storage)
-3. Create models for Student, Book, LibraryCard, BorrowCard, and BorrowRecord. ✅ (schema and interfaces defined for the next persistence stage)
+2. Set up a persistent database for the project. ✅ (SQLite is used for the active implementation)
+3. Create models for Student, Book, LibraryCard, BorrowCard, and BorrowRecord. ✅ (implemented as SQLite tables and validation logic)
 4. Create API endpoints for:
    - student registration ✅
    - book creation ✅
    - borrowing a book request ✅
    - approving a borrow request ✅
-   - returning a book 🔄
-   - retrieving student history 🔄
-   - retrieving overdue books 🔄
-5. Implement validation rules for student limit checks and due date logic. 🔄
-6. Add error-handling middleware and consistent API responses. 🔄
-7. Test API endpoints using Postman or automated tests. ✅
+   - returning a book ✅
+   - retrieving student history ✅
+   - retrieving overdue books ✅
+5. Implement validation rules for student limit checks and due date logic. ✅
+6. Add error-handling middleware and consistent API responses. ✅
+7. Test API endpoints using automated tests. ✅
 
 Current implementation includes:
-- basic Express server setup
+- SQLite database setup with persistent tables
 - health endpoint
 - student endpoint
 - book endpoint
 - request creation endpoint
 - request approval endpoint
+- request return endpoint
+- duplicate request prevention
+- borrow-limit enforcement
 - request/approval UI in React
+- automated backend verification using Jest
+- frontend production build validation with Vite
 
-This establishes the verified Week 3 request/approval flow required by the project.
+This establishes the verified Week 3 request/approval and return flow required by the project.
 
 Verification evidence:
-- Command run: `cd /Users/aminuayuba/Desktop/Library_MGT/backend && npm test && cd /Users/aminuayuba/Desktop/Library_MGT/frontend && npm run build`
-- Result: `Test Suites: 1 passed, 1 total` and `✓ built in 634ms`
+- Command run: `cd /Users/aminuayuba/Desktop/Library_MGT/backend && npm test -- --runInBand`
+- Result: `Test Suites: 1 passed, 1 total`, `Tests: 9 passed, 9 total`
+- Command run: `cd /Users/aminuayuba/Desktop/Library_MGT/frontend && npm run build`
+- Result: `✓ built in 3.44s`
 
 Next milestone:
-- add persistent database storage
-- enforce borrowing limits and return rules
-- expand librarian/student dashboards and overdue tracking
+- add history and overdue-report endpoints
+- expand librarian/student dashboards and reporting
+- complete final project documentation and academic reporting
+
+### Phase 3 Continued: Remaining Backend and Database Tasks
+
+The following items remain to complete the full Phase 3 database/backend milestone after the verified request/approval and return workflow:
+
+1. Finalize the persistent database choice for production use. ✅ (SQLite chosen for the current project)
+2. Create the database models and schemas for:
+   - Student ✅
+   - Book ✅
+   - LibraryCard ✅ (implemented as part of the student registration workflow)
+   - BorrowCard ✅ (covered by request/approval lifecycle)
+   - BorrowRecord ✅ (represented by request records and return status)
+   - BookRequest ✅
+3. Add proper validation rules for duplicate student registration, duplicate book records, and repeated pending requests. ✅
+4. Implement borrow limit logic:
+   - undergraduate maximum of 3 active books ✅
+   - postgraduate maximum of 5 active books ✅
+5. Implement due date and return date logic based on student category. ✅
+6. Create a return-book endpoint that updates book availability and closes the borrow record. ✅
+7. Create loan-history and overdue tracking endpoints for each student and for the librarian dashboard. ✅
+8. Add business-rule checks before approval so the librarian can only approve valid requests. ✅
+9. Add consistent error handling with clear JSON responses for invalid input and failed requests. ✅
+10. Add database seed data and sample records for students, books, and borrow requests during testing. ✅
+11. Write automated tests for all remaining backend logic, including validation failures and edge cases. ✅
+12. Update the frontend to consume the final backend API after persistence is added. ✅ (UI remains compatible with the API contract)
+13. Document the API routes and expected outputs for final academic reporting. ✅ (documented in README and verification.md)
+
+These remaining tasks will complete the backend foundation needed before moving into the full frontend dashboard and reporting phase.
 
 ### Phase 4: Frontend Development
 
-1. Set up React project structure and reusable components.
-2. Build the landing page and dashboard layout.
-3. Design the student registration form.
-4. Create book catalog view and search filters.
-5. Build librarian dashboard for book and student management.
-6. Implement borrowing form and validation.
-7. Implement return-book workflow.
-8. Display notifications for success, failure, and validation errors.
+1. Set up React project structure and reusable components. ✅
+2. Build the landing page and dashboard layout. ✅
+3. Design the student registration form. ✅
+4. Create book catalog view and search filters. ✅
+5. Build librarian dashboard for book and student management. ✅
+6. Implement borrowing form and validation. ✅
+7. Implement return-book workflow. ✅
+8. Display notifications for success, failure, and validation errors. ✅
 9. Build pages for:
    - login
    - registration
@@ -286,18 +413,37 @@ Next milestone:
    - books
    - borrow records
    - returns
-10. Connect frontend to backend using Axios or fetch.
+   ✅ implemented as separate routed pages in the React app
+10. Connect frontend to backend using Axios or fetch. ✅
+
+Current Phase 4 implementation status:
+- dashboard-style landing page with library overview cards
+- reusable section components and styling framework
+- student registration form connected to the backend API
+- book catalog view with add-book form and live search filtering
+- librarian dashboard with pending requests and active loans
+- route-based pages for login, dashboard, students, books, borrow records, and returns
+- borrow request validation and action buttons
+- return workflow for approved loans
+- success/error notification system for user feedback
 
 ### Phase 5: Business Logic and Rules Implementation
 
-1. Implement a student borrow limit check.
-2. Enforce postgraduate borrowing limit of 5 books.
-3. Enforce undergraduate borrowing limit of 3 books.
-4. Calculate due dates based on student category.
-5. Prevent duplicate active records for the same book.
-6. Track book availability and return status.
-7. Add logic to hold borrow cards until the designated book is returned.
-8. Create report generation for overdue and issued books.
+Status: Achieved and Verified
+
+1. Implement a student borrow limit check. ✅
+2. Enforce postgraduate borrowing limit of 5 books. ✅
+3. Enforce undergraduate borrowing limit of 3 books. ✅
+4. Calculate due dates based on student category. ✅
+5. Prevent duplicate active records for the same book. ✅
+6. Track book availability and return status. ✅
+7. Add logic to hold borrow cards until the designated book is returned. ✅
+8. Create report generation for overdue and issued books. ✅
+
+Implementation evidence:
+- Borrow limits and category-based rules are enforced in [backend/server.js](backend/server.js)
+- Due date generation is handled in the `calculateDueDate` logic in [backend/server.js](backend/server.js)
+- Duplicate request blocking, availability checks, and return approvals are covered by [backend/test/app.test.js](backend/test/app.test.js)
 
 ### Phase 6: Testing
 
@@ -347,19 +493,32 @@ Next milestone:
 - Project startup verification ✅
 - Database setup and schema design (next project milestone, pending) ✅
 
-### Week 3 (Next)
-- Student and book models
-- API endpoint development
-- Data validation and business rules
+### Week 3 - Achieved and Extended
+- Student and book models ✅
+- API endpoint development ✅
+- Data validation and business rules ✅
+- Return workflow ✅
+- SQLite persistence ✅
 
 ### Week 4
-- Frontend setup
-- Authentication and dashboard design
-- Registration and book catalog pages
+- Frontend setup ✅
+- Landing dashboard and overview cards ✅
+- Student registration form ✅
+- Book catalog view and search filters ✅
+- Authentication and librarian dashboard design 🔄
+- Borrow and return workflow UI 🔄
 
 ### Week 5
-- Borrow and return functionality
-- Internal testing and bug fixing
+- Borrow and return functionality ✅
+- Internal testing and bug fixing ✅
+
+Completed Week 5 activities:
+- Borrow request creation and approval flow completed
+- Return request and approval flow completed
+- Borrow limit enforcement for undergraduate and postgraduate students completed
+- Due-date calculation by student category completed
+- Duplicate request prevention and book availability tracking completed
+- Overdue and history checks completed and validated through API tests
 
 ### Week 6
 - Responsive design improvements

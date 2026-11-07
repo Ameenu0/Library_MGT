@@ -6,7 +6,7 @@ The Library Management System is a web-based application designed to help a univ
 This project is developed using:
 - React for the frontend
 - Node.js with Express.js for the backend
-- MongoDB as the recommended database system
+- SQLite as the active database system
 
 ## Objectives
 - Register students and assign library cards
@@ -29,7 +29,7 @@ This project is developed using:
 - Borrow cards remain with the library until the book is returned.
 
 ## Current Project Status
-The project is currently in the implementation phase, and the Week 3 request/approval milestone has been completed and verified.
+The project has reached the verified Phase 3 backend milestone and the request/approval/return workflow is complete and working with SQLite persistence.
 
 ### Achieved
 - Project requirement analysis completed
@@ -37,16 +37,23 @@ The project is currently in the implementation phase, and the Week 3 request/app
 - Week 2 environment setup completed
 - Frontend React app initialized and built successfully
 - Backend Node.js app initialized and server started successfully
-- Student book request flow implemented
+- SQLite database integration completed
+- Student registration and book creation implemented
+- Book request flow implemented
 - Librarian approval flow implemented
+- Return flow implemented
+- Duplicate request prevention enforced
+- Borrow-limit enforcement implemented
+- Due-date logic and overdue tracking added
+- Student history and overdue endpoints implemented
 - Backend API tests passed
 - Frontend production build passed
+- Documentation updated and verification steps recorded
 
-### Pending
-- Persistent database integration
-- Full book return and overdue logic
-- Stronger role-based UI and validation
-- Reporting and final academic documentation
+### Optional future work
+- Advanced librarian dashboard polish
+- Additional reporting and analytics pages
+- Extended role-based UI features
 
 ## Project Structure
 ```bash
@@ -93,8 +100,6 @@ Use the `.env.example` file as a template and create a `.env` file.
 Example:
 ```env
 PORT=5000
-MONGO_URI=mongodb://localhost:27017/library_mgt
-JWT_SECRET=your_jwt_secret_here
 NODE_ENV=development
 ```
 
@@ -113,11 +118,21 @@ cd frontend
 npm run build
 ```
 
+### Backend tests
+```bash
+cd backend
+npm test -- --runInBand
+```
+
 ### Backend server
 ```bash
 cd backend
-npm run test
 node server.js
+```
+
+### Seed demo data
+```bash
+curl -X POST http://localhost:5000/api/testing/seed
 ```
 
 ## Notes

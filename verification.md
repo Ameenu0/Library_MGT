@@ -13,235 +13,33 @@ Command used:
 `cd /Users/aminuayuba/Desktop/Library_MGT/frontend && npm run build`
 
 Result:
-`✓ built in 3.44s`
+`✓ built in 1.08s`
+
+The frontend has been updated to use separate role-based pages for login, librarian operations, student flows, and admin-only views. The admin inventory page now supports adding books, and the admin dashboard includes student search without registration access.
 
 ### Backend verification
 Command used:
-`cd /Users/aminuayuba/Desktop/Library_MGT/backend && npm run test && node server.js`
+`cd /Users/aminuayuba/Desktop/Library_MGT/backend && npm test -- --runInBand`
+
+Result:
+`Test Suites: 1 passed, 1 total` and `Tests: 9 passed, 9 total`
+
+### Backend runtime check
+Command used:
+`cd /Users/aminuayuba/Desktop/Library_MGT/backend && node server.js`
 
 Result:
 `Library backend running on port 5000`
 
-These outcomes confirm that the environment setup for Week 2 is complete and the project is ready for the next development phase.
+These outcomes confirm that the environment setup and the completed library workflow are working correctly, including the most recent admin and inventory refinements.
 
-### Week 3 verification
-Command used:
-`cd /Users/aminuayuba/Desktop/Library_MGT/backend && npm test && cd /Users/aminuayuba/Desktop/Library_MGT/frontend && npm run build`
-
-Result:
-- `Test Suites: 1 passed, 1 total`
-- `Tests: 4 passed, 4 total`
-- `✓ built in 754ms`
-
-This confirms the backend request/approval flow and the frontend build are both working successfully.
-
----
-
-## Application Startup and Feature Testing Commands
-
-This section lists the exact commands to run the application from the development server stage through feature testing, with browser testing prioritized first.
-
-### 1. Start the backend server
-Open a terminal and run:
-
-```bash
-cd /Users/aminuayuba/Desktop/Library_MGT/backend
-npm install
-cp .env.example .env
-npm run dev
-```
-
-Expected result:
-- The backend starts successfully.
-- The terminal should print a message indicating the server is running, such as:
-  `Library backend running on port 5000`
-
-Browser validation:
-- Open the browser and navigate to:
-  `http://localhost:5000/`
-- Check that the server is responding.
-- Open:
-  `http://localhost:5000/api/health`
-- Confirm the response contains a JSON success message such as `status: "ok"`.
-
-Terminal validation:
-```bash
-curl http://localhost:5000/api/health
-```
-
-Expected result:
-- JSON response with status `ok`.
-
-### 2. Start the frontend development server
-Open a second terminal and run:
-
-```bash
-cd /Users/aminuayuba/Desktop/Library_MGT/frontend
-npm install
-cp .env.example .env
-npm run dev -- --host 0.0.0.0
-```
-
-Expected result:
-- Vite starts the development server.
-- You will see a local URL such as:
-  `http://localhost:5173`
-
-Browser validation:
-- Open the browser and navigate to the Vite local URL.
-- Confirm the frontend loads without a blank page or runtime error.
-- Check that the project home screen renders correctly.
-
-Terminal validation:
-```bash
-cd /Users/aminuayuba/Desktop/Library_MGT/frontend
-npm run build
-```
-
-Expected result:
-- The app builds successfully without errors.
-
-### 3. Browser-first feature testing checklist
-Use the browser before terminal checks for all user-facing features.
-
-#### Student request flow
-1. Open the student dashboard or request page.
-2. Select a book to request.
-3. Submit the request.
-4. Confirm the request is created successfully.
-5. Check that the request status is shown as `Pending`.
-
-#### Librarian approval flow
-1. Open the librarian dashboard.
-2. View pending book requests.
-3. Select a request and verify the student details and book details.
-4. Approve the request.
-5. Confirm the request status changes to `Approved`.
-6. Verify the book is then issued to the student.
-
-#### Borrowing validation tests
-1. Try requesting more books than the allowed limit.
-2. Confirm validation prevents over-borrowing.
-3. Check that postgraduate students can request up to 5 books, while undergraduates can request up to 3.
-4. Confirm the system blocks duplicate active borrow requests for the same book.
-
-#### Return flow
-1. View active borrowed books.
-2. Mark a book as returned.
-3. Confirm the borrow card is released and the book becomes available again.
-4. Confirm the record updates in the dashboard.
-
-### 4. Terminal-based verification for feature testing
-Use these commands when browser testing is not enough or when validating backend data.
-
-#### Backend health check
-```bash
-curl http://localhost:5000/api/health
-```
-
-#### Frontend production build verification
-```bash
-cd /Users/aminuayuba/Desktop/Library_MGT/frontend
-npm run build
-```
-
-#### API endpoint tests after implementation
-```bash
-cd /Users/aminuayuba/Desktop/Library_MGT/backend
-npm test
-```
-
-#### Manual API route checks
-```bash
-curl http://localhost:5000/api/students
-curl http://localhost:5000/api/books
-curl http://localhost:5000/api/requests
-curl -X PATCH http://localhost:5000/api/requests/1/approve
-```
-
-Expected result:
-- Successful JSON responses for each endpoint after implementation.
-- The approval request returns the updated request status as `approved`.
-
-### 5. Exact commands for Week 3 implementation validation
-Run the following commands to verify the Week 3 work:
-
-```bash
-cd /Users/aminuayuba/Desktop/Library_MGT/backend
-npm test
-```
-
-Then in the frontend terminal:
-
-```bash
-cd /Users/aminuayuba/Desktop/Library_MGT/frontend
-npm run build
-```
-
-Expected result:
-- The backend test suite passes.
-- The frontend build completes successfully.
-- The request/approval logic is validated by the automated backend tests.
-
-### 6. Final verification checklist before moving to the next milestone
-Before marking a feature complete, confirm all of the following:
-
-- The backend server is still running.
-- The frontend server is still running.
-- The page loads correctly in the browser.
-- The required user action succeeds in the UI.
-- The request/approval/update reflects in the database or API response.
-- The action is validated by terminal command when needed.
-- No console error appears in the browser.
-
----
-
-## Week 3: Request and Approval Workflow
-
-### Objective
-Implement the student request flow and librarian approval flow required by the project system design.
-
-### Browser-first verification
-1. Open the frontend in the browser using the development URL.
-2. Enter a student ID and book ID in the request form.
-3. Submit the book request.
-4. Confirm the request appears in the pending requests list.
-5. Click the Approve button for that request.
-6. Confirm the status changes from `pending` to `approved`.
-7. Ensure the page does not show errors and the action is reflected clearly in the UI.
-
-### Terminal verification
-```bash
-cd /Users/aminuayuba/Desktop/Library_MGT/backend
-npm test
-```
-
-Expected result:
-- All backend tests pass.
-- The request approval flow is validated in the test suite.
-
-### Exact request/approval API check
-```bash
-curl http://localhost:5000/api/health
-curl http://localhost:5000/api/requests
-curl -X POST http://localhost:5000/api/requests \
-  -H "Content-Type: application/json" \
-  -d '{"studentId":"STD-002","bookId":"BK-002"}'
-curl -X PATCH http://localhost:5000/api/requests/1/approve
-```
-
-Expected result:
-- Health check returns `status: "ok"`.
-- Request creation returns a new pending request.
-- Approval updates the request status to `approved`.
-
-### Week 3 completion status
-- Student request creation: completed
-- Librarian approval action: completed
-- API validation: completed
-- Frontend build validation: completed
-
----
+### Latest Confirmed Features
+- Admin-only navigation is isolated from librarian routes.
+- Admin Library Inventory allows adding new books.
+- Admin dashboard supports student lookup by registration number or name.
+- Student search results surface active loans and overdue status when present.
+- The login route remains the default landing page.
+- The application continues to build successfully after the latest admin and routing updates.
 
 ## Week 1: Requirements Gathering and Planning
 
@@ -445,6 +243,290 @@ Example browser validation:
 - Open the React app in the browser at the local development URL.
 - Check that the page loads without errors.
 - Confirm the backend API responds if the server is running.
+
+---
+## Week 3: Phase 3 Database and Backend Completion
+
+### What was achieved
+The Phase 3 milestone was completed successfully with the following backend capabilities implemented and verified:
+
+- Persistent SQLite database created and used for the project
+- Student registration records stored and validated
+- Book catalog records stored and validated
+- Book request creation implemented
+- Librarian approval workflow implemented
+- Book return workflow implemented
+- Duplicate pending request prevention enforced
+- Borrow limit rules enforced for students:
+  - undergraduate: 3 active loans
+  - postgraduate: 5 active loans
+- Due date calculation based on student category implemented
+- Student loan history endpoint implemented
+- Overdue request tracking endpoint implemented
+- Database reset and seed endpoints added for testing and demo setup
+- Clear JSON error responses implemented for invalid requests and failed operations
+- Automated regression tests added and passing
+
+### Verification commands used
+Command used:
+`cd /Users/aminuayuba/Desktop/Library_MGT/backend && npm test -- --runInBand`
+
+Result:
+- `Test Suites: 1 passed, 1 total`
+- `Tests: 9 passed, 9 total`
+
+Frontend build validation:
+`cd /Users/aminuayuba/Desktop/Library_MGT/frontend && npm run build`
+
+Result:
+- `✓ built in 539ms`
+
+### Evidence summary
+These results confirm that the Week 3 Phase 3 work is complete and the library system is functioning according to the core project requirements.
+
+### Example API checks
+The following endpoints were verified through the test suite and runtime logic:
+- `GET /api/health`
+- `POST /api/students`
+- `POST /api/books`
+- `POST /api/requests`
+- `PATCH /api/requests/:id/approve`
+- `PATCH /api/requests/:id/return`
+- `GET /api/requests/history`
+- `GET /api/requests/overdue`
+- `DELETE /api/testing/reset`
+- `POST /api/testing/seed`
+
+This confirms the implemented workflow matches the project requirement for student request, librarian approval, due-date management, and return tracking.
+
+---
+
+## Week 4: Frontend Phase 4 Completion
+
+### Tasks completed in this week
+The following Phase 4 tasks were completed successfully:
+
+1. React project structure and reusable UI components
+2. Landing page and dashboard layout
+3. Student registration form
+4. Book catalog view with search and filtering
+5. Librarian dashboard for book and student management
+6. Borrowing form and validation
+7. Return-book workflow
+8. Success, failure, and validation notifications
+
+### Validation evidence
+Command used:
+`cd /Users/aminuayuba/Desktop/Library_MGT/frontend && npm run build`
+
+Result:
+`✓ built in 512ms`
+
+This confirms the frontend dashboard, registration form, catalog, librarian actions, borrowing flow, return flow, and notification system compile successfully and are ready for the next improvement phase.
+
+### Application Startup and Feature Testing Commands
+
+This section lists the exact commands to run the application from the development server stage through feature testing, with browser testing prioritized first.
+
+### 1. Start the backend server
+Open a terminal and run:
+
+```bash
+cd /Users/aminuayuba/Desktop/Library_MGT/backend
+npm install
+cp .env.example .env
+npm run dev
+```
+
+Expected result:
+- The backend starts successfully.
+- The terminal should print a message indicating the server is running, such as:
+  `Library backend running on port 5000`
+
+Browser validation:
+- Open the browser and navigate to:
+  `http://localhost:5000/`
+- Check that the server is responding.
+- Open:
+  `http://localhost:5000/api/health`
+- Confirm the response contains a JSON success message such as `status: "ok"`.
+
+Terminal validation:
+```bash
+curl http://localhost:5000/api/health
+```
+
+Expected result:
+- JSON response with status `ok`.
+
+### 2. Start the frontend development server
+Open a second terminal and run:
+
+```bash
+cd /Users/aminuayuba/Desktop/Library_MGT/frontend
+npm install
+cp .env.example .env
+npm run dev -- --host 0.0.0.0
+```
+
+Expected result:
+- Vite starts the development server.
+- You will see a local URL such as:
+  `http://localhost:5173`
+
+Browser validation:
+- Open the browser and navigate to the Vite local URL.
+- Confirm the frontend loads without a blank page or runtime error.
+- Check that the project home screen renders correctly.
+
+Terminal validation:
+```bash
+cd /Users/aminuayuba/Desktop/Library_MGT/frontend
+npm run build
+```
+
+Expected result:
+- The app builds successfully without errors.
+
+### 3. Browser-first feature testing checklist
+Use the browser before terminal checks for all user-facing features.
+
+#### Student request flow
+1. Open the student dashboard or request page.
+2. Select a book to request.
+3. Submit the request.
+4. Confirm the request is created successfully.
+5. Check that the request status is shown as `Pending`.
+
+#### Librarian approval flow
+1. Open the librarian dashboard.
+2. View pending book requests.
+3. Select a request and verify the student details and book details.
+4. Approve the request.
+5. Confirm the request status changes to `Approved`.
+6. Verify the book is then issued to the student.
+
+#### Borrowing validation tests
+1. Try requesting more books than the allowed limit.
+2. Confirm validation prevents over-borrowing.
+3. Check that postgraduate students can request up to 5 books, while undergraduates can request up to 3.
+4. Confirm the system blocks duplicate active borrow requests for the same book.
+
+#### Return flow
+1. View active borrowed books.
+2. Mark a book as returned.
+3. Confirm the borrow card is released and the book becomes available again.
+4. Confirm the record updates in the dashboard.
+
+### 4. Terminal-based verification for feature testing
+Use these commands when browser testing is not enough or when validating backend data.
+
+#### Backend health check
+```bash
+curl http://localhost:5000/api/health
+```
+
+#### Frontend production build verification
+```bash
+cd /Users/aminuayuba/Desktop/Library_MGT/frontend
+npm run build
+```
+
+#### API endpoint tests after implementation
+```bash
+cd /Users/aminuayuba/Desktop/Library_MGT/backend
+npm test
+```
+
+#### Manual API route checks
+```bash
+curl http://localhost:5000/api/students
+curl http://localhost:5000/api/books
+curl http://localhost:5000/api/requests
+curl -X PATCH http://localhost:5000/api/requests/1/approve
+```
+
+Expected result:
+- Successful JSON responses for each endpoint after implementation.
+- The approval request returns the updated request status as `approved`.
+
+### 5. Exact commands for Week 3 implementation validation
+Run the following commands to verify the Week 3 work:
+
+```bash
+cd /Users/aminuayuba/Desktop/Library_MGT/backend
+npm test
+```
+
+Then in the frontend terminal:
+
+```bash
+cd /Users/aminuayuba/Desktop/Library_MGT/frontend
+npm run build
+```
+
+Expected result:
+- The backend test suite passes.
+- The frontend build completes successfully.
+- The request/approval logic is validated by the automated backend tests.
+
+### 6. Final verification checklist before moving to the next milestone
+Before marking a feature complete, confirm all of the following:
+
+- The backend server is still running.
+- The frontend server is still running.
+- The page loads correctly in the browser.
+- The required user action succeeds in the UI.
+- The request/approval/update reflects in the database or API response.
+- The action is validated by terminal command when needed.
+- No console error appears in the browser.
+
+---
+
+## Week 3: Request and Approval Workflow
+
+### Objective
+Implement the student request flow and librarian approval flow required by the project system design.
+
+### Browser-first verification
+1. Open the frontend in the browser using the development URL.
+2. Enter a student ID and book ID in the request form.
+3. Submit the book request.
+4. Confirm the request appears in the pending requests list.
+5. Click the Approve button for that request.
+6. Confirm the status changes from `pending` to `approved`.
+7. Ensure the page does not show errors and the action is reflected clearly in the UI.
+
+### Terminal verification
+```bash
+cd /Users/aminuayuba/Desktop/Library_MGT/backend
+npm test
+```
+
+Expected result:
+- All backend tests pass.
+- The request approval flow is validated in the test suite.
+
+### Exact request/approval API check
+```bash
+curl http://localhost:5000/api/health
+curl http://localhost:5000/api/requests
+curl -X POST http://localhost:5000/api/requests \
+  -H "Content-Type: application/json" \
+  -d '{"studentId":"STD-002","bookId":"BK-002"}'
+curl -X PATCH http://localhost:5000/api/requests/1/approve
+```
+
+Expected result:
+- Health check returns `status: "ok"`.
+- Request creation returns a new pending request.
+- Approval updates the request status to `approved`.
+
+### Week 3 completion status
+- Student request creation: completed
+- Librarian approval action: completed
+- API validation: completed
+- Frontend build validation: completed
 
 ---
 

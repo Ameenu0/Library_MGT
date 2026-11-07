@@ -1,4 +1,4 @@
-1. Every student is expected to register with the library, after registration the students are given a library card which has the registration number, faculty and department, and also 3 borrow card which are used to borrow books from the library
+1. Every student is expected to register with the library,the student comes with a copy of admission letter, student information form and 2 passport, after registration the students are given a library card which has the registration number, faculty and department, and also 3 borrow card which are used to borrow books from the library
 
 
 2. A student can only borrow 3 books at a time and post graduate students are given 5
