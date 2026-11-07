@@ -21,9 +21,15 @@ if (usePostgres) {
   run = async (sql, params = []) => {
     const { text, values } = convertSqlitePlaceholders(sql, params);
     const result = await pool.query(text, values);
+    const firstRow = result.rows?.[0];
+    const id = firstRow && Object.prototype.hasOwnProperty.call(firstRow, 'id')
+      ? firstRow.id
+      : null;
+
     return {
-      id: result.rows[0]?.id ?? null,
+      id,
       changes: result.rowCount ?? 0,
+      rows: result.rows || [],
     };
   };
 

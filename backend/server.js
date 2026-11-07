@@ -207,32 +207,32 @@ app.post('/api/testing/seed', async (req, res) => {
     await resetDatabaseTables();
 
     const student1 = await run(
-      `INSERT INTO students (registrationNumber, fullName, faculty, department, status) VALUES (?, ?, ?, ?, ?)`,
+      `INSERT INTO students (registrationNumber, fullName, faculty, department, status) VALUES (?, ?, ?, ?, ?) RETURNING id`,
       ['CST/23/SWE/01149', 'Ada Seed', 'Science', 'Computer Science', 'undergraduate']
     );
 
     const student2 = await run(
-      `INSERT INTO students (registrationNumber, fullName, faculty, department, status) VALUES (?, ?, ?, ?, ?)`,
+      `INSERT INTO students (registrationNumber, fullName, faculty, department, status) VALUES (?, ?, ?, ?, ?) RETURNING id`,
       ['ENG/23/MEE/01150', 'Grace Seed', 'Engineering', 'Mechanical Engineering', 'postgraduate']
     );
 
     const book1 = await run(
-      `INSERT INTO books (title, author, callNumber, accessionNumber, available) VALUES (?, ?, ?, ?, ?)`,
+      `INSERT INTO books (title, author, callNumber, accessionNumber, available) VALUES (?, ?, ?, ?, ?) RETURNING id`,
       ['Data Structures', 'Jane Author', 'QA-100', 'ACC-SEED-001', 1]
     );
 
     const book2 = await run(
-      `INSERT INTO books (title, author, callNumber, accessionNumber, available) VALUES (?, ?, ?, ?, ?)`,
+      `INSERT INTO books (title, author, callNumber, accessionNumber, available) VALUES (?, ?, ?, ?, ?) RETURNING id`,
       ['Research Methods', 'John Scholar', 'QA-200', 'ACC-SEED-002', 1]
     );
 
     const request1 = await run(
-      `INSERT INTO requests (studentId, bookId, status, requestedAt, approvedAt, dueDate) VALUES (?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO requests (studentId, bookId, status, requestedAt, approvedAt, dueDate) VALUES (?, ?, ?, ?, ?, ?) RETURNING id`,
       [String(student1.id), String(book1.id), 'approved', new Date().toISOString(), new Date().toISOString(), calculateDueDate({ status: 'undergraduate' }, new Date().toISOString())]
     );
 
     const request2 = await run(
-      `INSERT INTO requests (studentId, bookId, status, requestedAt, approvedAt, dueDate) VALUES (?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO requests (studentId, bookId, status, requestedAt, approvedAt, dueDate) VALUES (?, ?, ?, ?, ?, ?) RETURNING id`,
       [String(student2.id), String(book2.id), 'approved', new Date().toISOString(), new Date().toISOString(), calculateDueDate({ status: 'postgraduate' }, new Date().toISOString())]
     );
 
@@ -397,7 +397,7 @@ app.post('/api/students', async (req, res) => {
     }
 
     const result = await run(
-      `INSERT INTO students (registrationNumber, fullName, faculty, department, status, password) VALUES (?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO students (registrationNumber, fullName, faculty, department, status, password) VALUES (?, ?, ?, ?, ?, ?) RETURNING id`,
       [registrationNumber, fullName, faculty, department, status, password || null]
     );
 
@@ -410,14 +410,14 @@ app.post('/api/students', async (req, res) => {
     await run('DELETE FROM library_cards WHERE studentId = ?', [student.id]);
 
     await run(
-      `INSERT INTO library_cards (studentId, libraryCardNumber, registrationNumber, faculty, department) VALUES (?, ?, ?, ?, ?)`,
+      `INSERT INTO library_cards (studentId, libraryCardNumber, registrationNumber, faculty, department) VALUES (?, ?, ?, ?, ?) RETURNING id`,
       [student.id, libraryCardNumber, registrationNumber, faculty, department]
     );
 
     for (let i = 0; i < borrowLimit; i += 1) {
       const borrowCardNumber = generateBorrowCardNumber(student.id, i);
       const cardResult = await run(
-        `INSERT INTO borrow_cards (studentId, borrowCardNumber, status) VALUES (?, ?, 'issued')`,
+        `INSERT INTO borrow_cards (studentId, borrowCardNumber, status) VALUES (?, ?, 'issued') RETURNING id`,
         [student.id, borrowCardNumber]
       );
 
@@ -516,7 +516,7 @@ app.post('/api/books', async (req, res) => {
     }
 
     const result = await run(
-      `INSERT INTO books (title, author, callNumber, accessionNumber, available) VALUES (?, ?, ?, ?, 1)`,
+      `INSERT INTO books (title, author, callNumber, accessionNumber, available) VALUES (?, ?, ?, ?, 1) RETURNING id`,
       [title, author, callNumber, accessionNumber]
     );
 
@@ -631,7 +631,7 @@ app.post('/api/requests', async (req, res) => {
     }
 
     const result = await run(
-      `INSERT INTO requests (studentId, bookId, status, requestedAt) VALUES (?, ?, 'pending', ?)`,
+      `INSERT INTO requests (studentId, bookId, status, requestedAt) VALUES (?, ?, 'pending', ?) RETURNING id`,
       [String(studentId), String(bookId), new Date().toISOString()]
     );
 
