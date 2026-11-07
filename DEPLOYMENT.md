@@ -14,6 +14,12 @@
    - npm install
    - npm run dev -- --host 0.0.0.0
 
+## Production PostgreSQL setup
+
+For a hosted production deployment, configure PostgreSQL and set:
+- DATABASE_URL=postgresql://username:password@host:port/database_name
+- CORS_ORIGIN=https://your-vercel-app-url
+
 ## Public deployment
 
 ### Frontend (Vercel)
@@ -28,10 +34,11 @@
    - npm install && npm start
 3. Set environment variables:
    - PORT=5000
+   - DATABASE_URL=postgresql://username:password@host:port/database_name
    - CORS_ORIGIN=https://your-vercel-app-url
 4. Deploy the service.
 
 ## Notes
-- For production, prefer PostgreSQL over SQLite.
-- SQLite is acceptable for a small school project demo but is less robust for public multi-user deployment.
-- The app currently expects the frontend to use the deployed backend URL instead of localhost.
+- PostgreSQL is the recommended production database for this system.
+- The app now supports PostgreSQL when DATABASE_URL is supplied.
+- Local development can still continue without a live PostgreSQL instance when using the fallback behavior.

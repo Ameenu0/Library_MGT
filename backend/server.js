@@ -6,10 +6,25 @@ const { db, get, all, run } = require('./database');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
+const usePostgres = !!(process.env.DATABASE_URL && process.env.DATABASE_URL.startsWith('postgres'));
 const allowedOrigins = (process.env.CORS_ORIGIN || 'http://localhost:5173,http://127.0.0.1:5173')
   .split(',')
   .map((origin) => origin.trim())
   .filter(Boolean);
+
+const resetDatabaseTables = async () => {
+  if (usePostgres) {
+    await run('TRUNCATE TABLE requests, books, borrow_cards, library_cards, students RESTART IDENTITY CASCADE');
+    return;
+  }
+
+  await run('DELETE FROM requests');
+  await run('DELETE FROM books');
+  await run('DELETE FROM borrow_cards');
+  await run('DELETE FROM library_cards');
+  await run('DELETE FROM students');
+  await run('DELETE FROM sqlite_sequence WHERE name IN (\'students\', \'books\', \'requests\', \'borrow_cards\', \'library_cards\')');
+};
 
 app.use(cors({
   origin: (origin, callback) => {
@@ -180,12 +195,7 @@ app.get('/api/health', (req, res) => {
 
 app.delete('/api/testing/reset', async (req, res) => {
   try {
-    await run('DELETE FROM requests');
-    await run('DELETE FROM books');
-    await run('DELETE FROM borrow_cards');
-    await run('DELETE FROM library_cards');
-    await run('DELETE FROM students');
-    await run('DELETE FROM sqlite_sequence WHERE name IN (\'students\', \'books\', \'requests\', \'borrow_cards\', \'library_cards\')');
+    await resetDatabaseTables();
     return res.status(200).json({ message: 'Database reset for testing.' });
   } catch (error) {
     return res.status(500).json({ message: 'Failed to reset database', error: error.message });
@@ -194,12 +204,7 @@ app.delete('/api/testing/reset', async (req, res) => {
 
 app.post('/api/testing/seed', async (req, res) => {
   try {
-    await run('DELETE FROM requests');
-    await run('DELETE FROM books');
-    await run('DELETE FROM borrow_cards');
-    await run('DELETE FROM library_cards');
-    await run('DELETE FROM students');
-    await run('DELETE FROM sqlite_sequence WHERE name IN (\'students\', \'books\', \'requests\', \'borrow_cards\', \'library_cards\')');
+    await resetDatabaseTables();
 
     const student1 = await run(
       `INSERT INTO students (registrationNumber, fullName, faculty, department, status) VALUES (?, ?, ?, ?, ?)`,
@@ -457,10 +462,6 @@ app.post('/api/students/activate', async (req, res) => {
 
     if (!student) {
       return res.status(404).json({ message: 'Student not found. Please contact the library administrator.' });
-    }
-
-    if (student.password && String(student.password).trim()) {
-      return res.status(409).json({ message: 'This account has already been activated.' });
     }
 
     await run(
