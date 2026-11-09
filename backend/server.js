@@ -2,7 +2,7 @@ require('dotenv').config();
 
 const express = require('express');
 const cors = require('cors');
-const { db, get, all, run } = require('./database');
+const { db, get, all, run, ready } = require('./database');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -69,7 +69,7 @@ const getStudentByIdentifier = async (studentIdentifier) => {
   const value = String(studentIdentifier);
 
   const student = await get(
-    `SELECT * FROM students WHERE id = ? OR registrationNumber = ? LIMIT 1`,
+    `SELECT * FROM students WHERE CAST(id AS TEXT) = ? OR registrationNumber = ? LIMIT 1`,
     [value, value]
   );
 
@@ -82,7 +82,7 @@ const getBookByIdentifier = async (bookIdentifier) => {
   const value = String(bookIdentifier);
 
   const book = await get(
-    `SELECT * FROM books WHERE id = ? OR accessionNumber = ? LIMIT 1`,
+    `SELECT * FROM books WHERE CAST(id AS TEXT) = ? OR accessionNumber = ? LIMIT 1`,
     [value, value]
   );
 
@@ -192,6 +192,14 @@ app.get('/api/health', (req, res) => {
 // -----------------------------------------------------------
 // Student endpoints
 // -----------------------------------------------------------
+
+// Test-only routes: hidden in production so nobody can wipe the live database.
+app.use('/api/testing', (req, res, next) => {
+  if (process.env.NODE_ENV === 'production') {
+    return res.status(404).json({ message: 'Not found' });
+  }
+  return next();
+});
 
 app.delete('/api/testing/reset', async (req, res) => {
   try {
@@ -756,9 +764,17 @@ app.get('/', (req, res) => {
 });
 
 if (require.main === module) {
-  app.listen(PORT, () => {
-    console.log(`Library backend running on port ${PORT}`);
-  });
+  // Wait for the tables to exist before accepting requests.
+  ready
+    .then(() => {
+      app.listen(PORT, () => {
+        console.log(`Library backend running on port ${PORT}`);
+      });
+    })
+    .catch((error) => {
+      console.error('Database initialisation failed:', error.message);
+      process.exit(1);
+    });
 }
 
 module.exports = app;

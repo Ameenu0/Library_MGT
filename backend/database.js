@@ -1,11 +1,14 @@
 const path = require('path');
-const usePostgres = !!(process.env.DATABASE_URL && process.env.DATABASE_URL.startsWith('postgres'));
+
+const databaseUrl = process.env.DATABASE_URL || '';
+const usePostgres = databaseUrl.startsWith('postgres');
 
 let db = null;
 let run = null;
 let get = null;
 let all = null;
-let initializeDatabase = () => {};
+// Resolves once the tables exist. server.js waits for it before listening.
+let ready = Promise.resolve();
 
 const convertSqlitePlaceholders = (sql, params = []) => {
   let index = 0;
@@ -15,8 +18,38 @@ const convertSqlitePlaceholders = (sql, params = []) => {
 
 if (usePostgres) {
   const { Pool } = require('pg');
-  const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+
+  // Hosted Postgres (Render, Neon, Supabase...) needs SSL. A local one usually does not.
+  // Set PGSSL=false to turn SSL off explicitly.
+  const getSslConfig = () => {
+    if (process.env.PGSSL === 'false') return false;
+    if (/@(localhost|127\.0\.0\.1)(:|\/)/.test(databaseUrl)) return false;
+    return { rejectUnauthorized: false };
+  };
+
+  const pool = new Pool({ connectionString: databaseUrl, ssl: getSslConfig() });
+  pool.on('error', (error) => {
+    console.error('Unexpected PostgreSQL pool error:', error.message);
+  });
   db = pool;
+
+  // Postgres folds unquoted column names to lowercase (registrationNumber -> registrationnumber).
+  // The rest of the app expects camelCase, so map the keys back on every row.
+  const COLUMN_NAMES = [
+    'registrationNumber', 'fullName', 'createdAt', 'studentId', 'bookId',
+    'requestedAt', 'approvedAt', 'dueDate', 'returnedAt', 'callNumber',
+    'accessionNumber', 'libraryCardNumber', 'borrowCardNumber', 'issuedAt', 'usedAt',
+  ];
+  const camelByLowercase = Object.fromEntries(COLUMN_NAMES.map((name) => [name.toLowerCase(), name]));
+
+  const normaliseRow = (row) => {
+    if (!row) return row;
+    const output = {};
+    for (const [key, value] of Object.entries(row)) {
+      output[camelByLowercase[key] || key] = value;
+    }
+    return output;
+  };
 
   run = async (sql, params = []) => {
     const { text, values } = convertSqlitePlaceholders(sql, params);
@@ -29,41 +62,37 @@ if (usePostgres) {
     return {
       id,
       changes: result.rowCount ?? 0,
-      rows: result.rows || [],
+      rows: (result.rows || []).map(normaliseRow),
     };
   };
 
   get = async (sql, params = []) => {
     const { text, values } = convertSqlitePlaceholders(sql, params);
     const result = await pool.query(text, values);
-    return result.rows[0] || null;
+    return normaliseRow(result.rows[0]) || null;
   };
 
   all = async (sql, params = []) => {
     const { text, values } = convertSqlitePlaceholders(sql, params);
     const result = await pool.query(text, values);
-    return result.rows || [];
+    return (result.rows || []).map(normaliseRow);
   };
 
   const ensureColumnExists = async (tableName, columnName, columnType, defaultValue = null) => {
-    const query = `
-      SELECT EXISTS (
-        SELECT 1
-        FROM information_schema.columns
-        WHERE table_name = $1 AND column_name = $2
-      ) AS exists;
-    `;
-
-    const result = await pool.query(query, [tableName, columnName]);
-    if (result.rows[0]?.exists) {
-      return;
-    }
+    const result = await pool.query(
+      `SELECT EXISTS (
+         SELECT 1 FROM information_schema.columns
+         WHERE table_name = $1 AND column_name = $2
+       ) AS found`,
+      [tableName.toLowerCase(), columnName.toLowerCase()]
+    );
+    if (result.rows[0]?.found) return;
 
     const defaultClause = defaultValue === null ? '' : ` DEFAULT ${defaultValue}`;
     await pool.query(`ALTER TABLE ${tableName} ADD COLUMN ${columnName} ${columnType}${defaultClause};`);
   };
 
-  const initializeDatabase = async () => {
+  const initPostgres = async () => {
     await pool.query(`
       CREATE TABLE IF NOT EXISTS students (
         id SERIAL PRIMARY KEY,
@@ -76,9 +105,9 @@ if (usePostgres) {
         createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
     `);
-
     await ensureColumnExists('students', 'password', 'TEXT');
 
+    // available is INTEGER (1/0), not BOOLEAN, because server.js writes 1 and 0.
     await pool.query(`
       CREATE TABLE IF NOT EXISTS books (
         id SERIAL PRIMARY KEY,
@@ -86,10 +115,21 @@ if (usePostgres) {
         author TEXT,
         callNumber TEXT,
         accessionNumber TEXT UNIQUE,
-        available BOOLEAN DEFAULT TRUE,
+        available INTEGER DEFAULT 1,
         createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
     `);
+
+    // Migrate a books table created earlier with a BOOLEAN column.
+    const availableColumn = await pool.query(
+      `SELECT data_type FROM information_schema.columns
+       WHERE table_name = 'books' AND column_name = 'available'`
+    );
+    if (availableColumn.rows[0]?.data_type === 'boolean') {
+      await pool.query('ALTER TABLE books ALTER COLUMN available DROP DEFAULT');
+      await pool.query('ALTER TABLE books ALTER COLUMN available TYPE INTEGER USING available::int');
+      await pool.query('ALTER TABLE books ALTER COLUMN available SET DEFAULT 1');
+    }
 
     await pool.query(`
       CREATE TABLE IF NOT EXISTS requests (
@@ -103,7 +143,6 @@ if (usePostgres) {
         returnedAt TIMESTAMP
       );
     `);
-
     await ensureColumnExists('requests', 'dueDate', 'TIMESTAMP');
 
     await pool.query(`
@@ -131,9 +170,10 @@ if (usePostgres) {
     `);
   };
 
-  initializeDatabase().catch((error) => {
-    console.error('Failed to initialize PostgreSQL database:', error.message);
-  });
+  ready = initPostgres();
+  // Mark as handled so importing this file never causes an unhandled rejection;
+  // server.js still receives the rejection and reports it.
+  ready.catch(() => {});
 } else {
   const sqlite3 = require('sqlite3').verbose();
   const dbPath = path.join(__dirname, 'library.db');
@@ -176,7 +216,7 @@ if (usePostgres) {
     });
   });
 
-  const initializeDatabase = () => {
+  const initSqlite = () => {
     db.serialize(() => {
       db.run(`
         CREATE TABLE IF NOT EXISTS students (
@@ -266,7 +306,7 @@ if (usePostgres) {
     });
   };
 
-  initializeDatabase();
+  initSqlite();
 }
 
 module.exports = {
@@ -274,5 +314,6 @@ module.exports = {
   run,
   get,
   all,
-  initializeDatabase,
+  ready,
+  initializeDatabase: () => ready,
 };
