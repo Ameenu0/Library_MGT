@@ -1,3 +1,18 @@
+/* =====================================================================
+    LIBRARY MANAGEMENT SYSTEM  -  PAGE STYLES  (App.css)
+   =====================================================================
+    All visual styling for the app. App.jsx uses these class names, e.g. className="panel".
+    Order of this file:  1 page frame and menu  2 buttons  3 panels  4 forms  5 lists
+                         6 dashboard layouts  7 request rows
+                         then the RESPONSIVE section at the bottom, which re-arranges the layout
+                         for tablets and phones (breakpoints 1024px, 900px, 820px, 600px, 340px).
+    A "breakpoint" is a screen width: rules inside @media (max-width: 600px) only apply on screens
+    that are 600px wide or narrower.
+
+   1. PAGE FRAME
+   .app-shell is the outer wrapper of every page: full-height background with a soft gradient and
+   padding around the content. .topbar is the header row (logo + title on the left, menu on the right);
+   .main-layout is the centred column (max 1200px) that holds the page's panels. */
 .app-shell {
   min-height: 100vh;
   background:
@@ -7,6 +22,7 @@
 }
 
 .topbar,
+/* The page content column: panels are stacked with a gap between them. */
 .main-layout {
   max-width: 1200px;
   margin: 0 auto;
@@ -20,6 +36,7 @@
   margin-bottom: 28px;
 }
 
+/* MENU: the row of page links in the header. .nav-link is one link, .active marks the page you are on, .nav-badge is the red count bubble (pending requests). */
 .top-nav {
   display: flex;
   flex-wrap: wrap;
@@ -59,6 +76,7 @@
   box-shadow: 0 8px 18px rgba(239, 68, 68, 0.28);
 }
 
+/* BRAND: the logo and the title text on the left of the header. */
 .brand-block {
   display: grid;
   gap: 8px;
@@ -77,6 +95,7 @@
   flex-shrink: 0;
 }
 
+/* Small UPPERCASE label above a title (e.g. the university name). .section-kicker is the same style used inside panels. */
 .eyebrow,
 .section-kicker {
   margin: 0;
@@ -93,6 +112,11 @@
   color: #000000;
 }
 
+/* 2. BUTTONS
+   .primary-button  = main action (blue gradient)       .ghost-button = quiet button (Login / Logout)
+   .action-button   = small coloured button inside lists (.approve = green, .return = orange)
+   .text-link-button = a button that looks like a link (e.g. "Activate your account")
+   The grouped selectors give all of them the same shape; the lines after set each one's colours. */
 .ghost-button,
 .primary-button,
 .action-button,
@@ -127,6 +151,7 @@
   width: fit-content;
 }
 
+/* PASSWORD FIELD: an input with a Show / Hide toggle button inside the same rounded box. */
 .password-field {
   display: flex;
   align-items: center;
@@ -158,6 +183,7 @@
   text-transform: uppercase;
 }
 
+/* Row of buttons under the activation form (wraps onto new lines on small screens). */
 .activation-actions {
   display: flex;
   flex-wrap: wrap;
@@ -177,6 +203,7 @@
   background: #f59e0b;
 }
 
+/* Hover effect: buttons lift up 1px when the mouse is over them. */
 .ghost-button:hover,
 .primary-button:hover,
 .action-button:hover,
@@ -189,6 +216,9 @@
   gap: 26px;
 }
 
+/* 3. PANELS AND DASHBOARD BOXES
+   .panel is the white rounded card every section sits in. .hero-panel is the big top card (text on the left,
+   stat cards on the right). .stats-grid arranges the .stat-card boxes; data-accent picks each card's tint. */
 .panel {
   background: rgba(255, 255, 255, 0.92);
   border: 1px solid rgba(194, 212, 255, 0.9);
@@ -261,6 +291,7 @@
   color: #122742;
 }
 
+/* MESSAGE BANNER: the green (.success) or red (.error) message that appears after an action. */
 .status-banner {
   border-radius: 12px;
   padding: 12px 14px;
@@ -279,6 +310,7 @@
   border: 1px solid #fecdd3;
 }
 
+/* The title row at the top of a panel (heading on the left, optional subtitle on the right). */
 .section-header {
   display: flex;
   justify-content: space-between;
@@ -298,6 +330,9 @@
   font-weight: 600;
 }
 
+/* 4. FORMS
+   .stack-form places labels and inputs in one column; .form-row / .two-up put fields side by side.
+   Every input, select and label gets the same rounded, light-blue look below. */
 .stack-form {
   display: grid;
   gap: 16px;
@@ -316,6 +351,7 @@
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
+/* Each label wraps its text and its input, so the text sits above the field. */
 label {
   display: grid;
   gap: 8px;
@@ -323,6 +359,7 @@ label {
   font-weight: 600;
 }
 
+/* Text boxes and drop-downs: full width, rounded, with a blue outline when focused. */
 input,
 select {
   width: 100%;
@@ -340,6 +377,10 @@ select:focus {
   border-color: #6686ff;
 }
 
+/* 5. LISTS (books, students, requests)
+   .catalog-toolbar holds the search box; .catalog-list holds .book-item cards (used for both books and students);
+   .status-pill is the small coloured label (available / requested / borrowed / returned); .empty-list is the dashed
+   "nothing to show" message. */
 .catalog-toolbar {
   margin-bottom: 18px;
 }
@@ -440,6 +481,9 @@ select:focus {
   background: #f9fbff;
 }
 
+/* 6. DASHBOARD LAYOUTS
+   .dashboard-grid and .request-panels split a panel into two columns; .mini-panel is a smaller box inside a panel;
+   .mini-stats is the row of small numbers (Pending / Approved / Returned). */
 .librarian-panel {
   display: grid;
   gap: 20px;
@@ -468,6 +512,7 @@ select:focus {
   color: #12304d;
 }
 
+/* LOGIN SCREEN: two columns on desktop (title left, form right). .login-hint is the small blue help box. */
 .auth-panel {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -500,6 +545,7 @@ select:focus {
   font-size: 0.92rem;
 }
 
+/* Small numbers row (e.g. Quick Stats on the librarian dashboard): label on top, number below. */
 .mini-stats {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -528,6 +574,9 @@ select:focus {
   color: #112843;
 }
 
+/* 7. REQUEST ROWS
+   .request-list is a stack of .request-row items. Each row shows the request details on the left and an action
+   button or status label on the right. .selected highlights the book a student has clicked. */
 .request-list {
   display: grid;
   gap: 12px;
@@ -567,9 +616,107 @@ select:focus {
   padding: 12px;
 }
 
+/* ==========================================================================
+   Responsive additions
+   Desktop look is unchanged; everything below only adds fluid behaviour
+   and breakpoints (1024px, 900px, 820px, 600px, 340px).
+   ========================================================================== */
+
+/* --- Fluid foundations: nothing may push the page wider than the screen --- */
+.app-shell {
+  min-height: 100vh;
+  min-height: 100dvh;
+}
+
+.topbar > *,
+.main-layout > *,
+.hero-panel > *,
+.auth-panel > *,
+.dashboard-grid > *,
+.request-panels > *,
+.request-row > *,
+.book-item > * {
+  min-width: 0;
+}
+
+.brand-inline > div,
+.book-item h3,
+.book-item dd,
+.request-row strong,
+.request-row p,
+.mini-stats strong,
+.stat-card strong,
+.login-hint,
+.status-banner {
+  overflow-wrap: anywhere; /* long registration numbers, emails, titles */
+}
+
+/* Links styled as buttons (the Login link in the top bar) */
+a.ghost-button,
+a.primary-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+}
+
+.student-issue-summary {
+  display: grid;
+  gap: 6px;
+  margin-top: 4px;
+  padding-top: 12px;
+  border-top: 1px dashed #d6e2fb;
+}
+
+.student-issue-summary p {
+  margin: 0;
+}
+
+/* Keyboard focus that is visible on every control */
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+select:focus-visible {
+  outline: 3px solid rgba(45, 108, 223, 0.45);
+  outline-offset: 2px;
+}
+
+/* --- Touch devices: comfortable tap targets --- */
+@media (pointer: coarse) {
+  .nav-link,
+  .ghost-button,
+  .primary-button,
+  .action-button,
+  .password-toggle {
+    min-height: 44px;
+  }
+}
+
+/* --- Tablets and small laptops --------------------------------------- */
+@media (max-width: 1024px) {
+  .app-shell {
+    padding: 24px 16px 40px;
+  }
+
+  .hero-panel {
+    grid-template-columns: 1fr;
+  }
+
+  .stats-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 900px) {
+  .stats-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* --- Large phones / portrait tablets --------------------------------- */
 @media (max-width: 820px) {
   .topbar,
-  .hero-panel,
+  .auth-panel,
   .two-up,
   .dashboard-grid,
   .request-panels {
@@ -578,18 +725,165 @@ select:focus {
 
   .topbar {
     display: grid;
+    gap: 14px;
+    margin-bottom: 20px;
   }
 
-  .hero-panel {
-    display: grid;
+  /* nav links wrap into compact rows so every link (and Logout) is visible */
+  .top-nav {
+    justify-content: flex-start;
+    gap: 6px;
   }
 
+  .nav-link,
+  .top-nav .ghost-button {
+    padding: 8px 10px;
+    font-size: 0.92rem;
+    white-space: nowrap;
+  }
+
+  .hero-panel,
   .two-up {
     display: grid;
+  }
+
+  .auth-panel {
+    gap: 18px;
+    align-items: start;
+  }
+
+  .section-header {
+    flex-direction: column;
+    align-items: flex-start;
   }
 
   .request-row {
     flex-direction: column;
     align-items: flex-start;
+  }
+
+  .request-row .action-button {
+    width: 100%;
+  }
+}
+
+/* --- Phones ------------------------------------------------------------ */
+@media (max-width: 600px) {
+  .app-shell {
+    padding: 16px 12px 32px;
+  }
+
+  .main-layout {
+    gap: 18px;
+  }
+
+  .panel {
+    padding: 16px;
+    border-radius: 18px;
+  }
+
+  .mini-panel {
+    padding: 14px;
+  }
+
+  .brand-logo {
+    width: 36px;
+    height: 36px;
+  }
+
+  .topbar h1 {
+    font-size: 1.1rem;
+  }
+
+  .hero-copy h2,
+  .auth-copy h2 {
+    font-size: 1.5rem;
+  }
+
+  .hero-copy p {
+    font-size: 0.95rem;
+  }
+
+  .section-header h2 {
+    font-size: 1.35rem;
+  }
+
+  /* 16px inputs stop iOS Safari from zooming the page when a field is focused */
+  input,
+  select,
+  .password-field input {
+    font-size: 16px;
+  }
+
+  .book-item dl {
+    grid-template-columns: 1fr;
+  }
+
+  .mini-stats {
+    grid-template-columns: repeat(auto-fit, minmax(84px, 1fr));
+    gap: 8px;
+  }
+
+  .mini-stats div {
+    padding: 10px 8px;
+  }
+
+  .mini-stats span {
+    font-size: 0.62rem;
+    letter-spacing: 0.03em;
+  }
+
+  .activation-actions {
+    flex-direction: column;
+  }
+
+  .activation-actions > *,
+  .stack-form .primary-button {
+    width: 100%;
+  }
+
+  .stack-form {
+    gap: 14px;
+  }
+
+  .form-row {
+    gap: 14px;
+  }
+}
+
+/* --- Very small phones (e.g. 320px wide) --------------------------------- */
+@media (max-width: 340px) {
+  .stats-grid,
+  .mini-stats {
+    grid-template-columns: 1fr;
+  }
+
+  .brand-inline {
+    gap: 8px;
+  }
+
+  .stat-card {
+    padding: 14px 12px;
+  }
+}
+
+/* --- Respect reduced-motion settings ------------------------------------ */
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  .ghost-button,
+  .primary-button,
+  .action-button,
+  .text-link-button {
+    transition: none;
+  }
+
+  .ghost-button:hover,
+  .primary-button:hover,
+  .action-button:hover,
+  .text-link-button:hover {
+    transform: none;
   }
 }

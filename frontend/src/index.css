@@ -1,3 +1,7 @@
+/* GLOBAL STYLES (index.css), loaded once by main.jsx.
+   These apply to the whole page; App.css then styles the individual screens.
+
+   GLOBAL SETTINGS: the default font, text colour and page background for the whole app, plus smoother text rendering. */
 :root {
   font-family: Inter, 'Segoe UI', sans-serif;
   line-height: 1.5;
@@ -8,25 +12,40 @@
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
 }
 
+/* box-sizing: border-box makes padding count inside an element's width, so boxes do not grow wider than expected. */
 * {
   box-sizing: border-box;
 }
 
+/* Smooth scrolling when jumping to a link on the page. */
 html {
   scroll-behavior: smooth;
 }
 
+/* Remove the browser's default outer margin. */
 body {
   margin: 0;
 }
 
+/* Buttons, inputs, drop-downs and text areas use the page font instead of the browser's default font. */
 button,
-input {
+input,
+select,
+textarea {
   font: inherit;
 }
 
+/* Images never get wider than their container and keep their proportions (important on phones). */
+img {
+  max-width: 100%;
+  height: auto;
+}
+
+/* #root is the element React draws the app into (see index.html and main.jsx). It is at least as tall as the screen. */
 #root {
   min-height: 100vh;
 }

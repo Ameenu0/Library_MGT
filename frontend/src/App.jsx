@@ -1,9 +1,55 @@
+// =====================================================================
+//  LIBRARY MANAGEMENT SYSTEM  -  FRONTEND  (App.jsx)
+// =====================================================================
+//
+//  WHAT THIS FILE IS
+//  The whole React user interface lives here: the login screen and every page
+//  for the three kinds of users. It talks to the backend (server.js) with fetch().
+//
+//  THE THREE USER ROLES AND THEIR PAGES
+//    librarian   /dashboard  /students  /books  /borrow-records  /returns
+//    admin       /admin-dashboard  /admin-books  /admin-borrow-records  /admin-overdue
+//    student     /student-dashboard  /student-borrow
+//    everyone    /login   (opening "/" redirects there)
+//
+//  HOW THE FILE IS ORGANISED (top to bottom)
+//    1. Imports and constants        API address, empty form values, registration-number rules
+//    2. Login-memory helpers         read the saved login / message from the browser
+//    3. Small shared pieces          StatCard, SectionHeader, AppShell (the page frame + menu)
+//    4. Page components              LoginPage, then one function per screen
+//    5. App()                        the "brain": data, handlers and the route table
+//    6. export default App           main.jsx renders it
+//
+//  HOW DATA FLOWS
+//    App() keeps the lists (students, books, requests) in React state, loads them
+//    from the API, and passes them DOWN to the pages as props. When a user does
+//    something (register, request, approve...), the matching handler in App() calls
+//    the API and then runs refreshAll() so every page shows the latest data.
+//
+//    API (server.js)  <-- fetch -->  App() state  -- props -->  Page components
+//
+//  IMPORTANT TO KNOW
+//    * The page guards (isLoggedIn && userRole === ...) only decide which SCREEN is shown.
+//      They are not real security, because the backend does not check who is calling yet.
+//    * Styling is in App.css (class names such as "panel", "hero-panel", "request-row").
+
 import { BrowserRouter, NavLink, Navigate, Route, Routes, useNavigate } from 'react-router-dom'
+// React hooks used in this file:
+//   useState   remember a value and redraw the page when it changes
+//   useEffect  run code when the page first appears, or when chosen values change
+//   useMemo    remember a calculated list (e.g. search results) so it is only recalculated when its inputs change
+//   useRef     keep a value (here: a timer) between redraws without causing a redraw
 import { useEffect, useMemo, useRef, useState } from 'react'
+// All styling for the app (layout, colours, responsive rules) comes from this file.
 import './App.css'
 
+// Base address of the backend API. Every request is `${API_URL}/<route>`, e.g. `${API_URL}/books`.
+// VITE_API_URL is set in Vercel (Settings > Environment Variables) and is baked into the app when it is BUILT,
+// so after changing it you must redeploy. Without it the app falls back to the local backend on port 5000.
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api'
 
+// Blank values for the librarian's "Register Student" form. The form is reset to this after a successful save.
+// `status` is the student category: 'undergraduate' (3 books) or 'postgraduate' (5 books).
 const EMPTY_STUDENT_FORM = {
   registrationNumber: '',
   fullName: '',
@@ -13,6 +59,7 @@ const EMPTY_STUDENT_FORM = {
   password: '',
 }
 
+// Blank values for the "Add Book" form, used the same way.
 const EMPTY_BOOK_FORM = {
   title: '',
   author: '',
@@ -20,16 +67,23 @@ const EMPTY_BOOK_FORM = {
   accessionNumber: '',
 }
 
+// NOTE: not used anywhere in this file (left over from an earlier version of the login screen). Safe to delete.
 const EMPTY_LOGIN_FORM = {
   email: '',
   password: '',
 }
 
+// Allowed format of a registration number: FACULTY/YY/DEPARTMENT/NUMBER, e.g. CST/23/SWE/01137.
+// The backend uses the same rule, so a number that passes here is also accepted by the API.
 const REGISTRATION_NUMBER_PATTERN = /^[A-Z]{2,10}\/\d{2}\/[A-Z]{2,10}\/\d{5}$/
 
+// Cleans what the user typed: removes spaces and makes it UPPER CASE, e.g. " cst/23/swe/01137" -> "CST/23/SWE/01137".
 const normalizeRegistrationNumber = (value = '') => String(value).trim().replace(/\s+/g, '').toUpperCase()
+// True when the (cleaned) text matches the registration-number format above.
 const isValidRegistrationNumber = (value = '') => REGISTRATION_NUMBER_PATTERN.test(normalizeRegistrationNumber(value))
 
+// NOTE: DEFAULT_LIBRARIAN and DEFAULT_ADMIN are not used anywhere in this file. The real staff login is checked by the
+// backend (POST /auth/login). Safe to delete; passwords should not live in frontend code, because everyone can read it.
 const DEFAULT_LIBRARIAN = {
   email: 'librarian@library.com',
   password: 'librarian12',
@@ -40,9 +94,14 @@ const DEFAULT_ADMIN = {
   password: 'admin123',
 }
 
+// Names of the two entries this app saves in the browser:
+//   localStorage   'library_auth_state'   who is logged in (survives refreshing or closing the tab)
+//   sessionStorage 'library_notice_state' the current green/red message (kept only for this tab)
 const AUTH_STORAGE_KEY = 'library_auth_state'
 const NOTICE_STORAGE_KEY = 'library_notice_state'
 
+// Reads the saved login from localStorage when the app starts, so refreshing the page does not log you out.
+// Returns { isLoggedIn, userRole, activeStudent }. If nothing is saved or the data is damaged, it returns "logged out".
 const readStoredAuth = () => {
   try {
     const rawValue = localStorage.getItem(AUTH_STORAGE_KEY)
@@ -56,6 +115,7 @@ const readStoredAuth = () => {
   }
 }
 
+// Reads the saved message banner (text + 'success' or 'error' colour) from sessionStorage, or an empty one.
 const readStoredNotice = () => {
   try {
     const rawValue = sessionStorage.getItem(NOTICE_STORAGE_KEY)
@@ -69,6 +129,8 @@ const readStoredNotice = () => {
   }
 }
 
+// SMALL SHARED PIECES
+// StatCard: one coloured box with a label and a number (e.g. "Students 12"). `accent` picks the colour (blue, green, purple, orange).
 function StatCard({ label, value, accent }) {
   return (
     <div className="stat-card" data-accent={accent}>
@@ -78,6 +140,7 @@ function StatCard({ label, value, accent }) {
   )
 }
 
+// SectionHeader: the heading at the top of a panel, with an optional small subtitle on the right.
 function SectionHeader({ title, subtitle }) {
   return (
     <div className="section-header">
@@ -90,10 +153,14 @@ function SectionHeader({ title, subtitle }) {
 }
 
 // Shared layout used by all user roles. It renders the top navigation bar and the page content area.
+// Props: children (the page content), isLoggedIn, onLogout, showNav (hide the menu on the login page),
+//        role ('librarian' | 'admin' | 'student', decides which menu links appear), requests (used for the red badges).
 function AppShell({ children, isLoggedIn, onLogout, showNav = true, role = 'librarian', requests = [] }) {
+  // Red number badges on the menu: how many requests wait for approval, and how many returns wait for confirmation.
   const pendingBorrowRequestCount = requests.filter((request) => request.status === 'pending').length
   const pendingReturnRequestCount = requests.filter((request) => request.status === 'return_requested').length
 
+  // The menu links depend on the role: student, admin, or (default) librarian. NavLink highlights the page you are on.
   const navLinks = role === 'student'
     ? (
       <>
@@ -129,6 +196,7 @@ function AppShell({ children, isLoggedIn, onLogout, showNav = true, role = 'libr
       </>
     )
 
+  // The page frame: a header (logo, title, menu, Login/Logout button) followed by <main> where each page's content goes.
   return (
     <div className="app-shell">
       <header className="topbar">
@@ -160,10 +228,20 @@ function AppShell({ children, isLoggedIn, onLogout, showNav = true, role = 'libr
   )
 }
 
+// LOGIN PAGE (/login)
+// Shows either the login form or the "activate your account" form (for students registered without a password).
+// Props: onLogin / onAdminLogin / onStudentLogin are functions from App() that record who logged in.
+// Login flow:
+//   1. The user types a registration number or email plus a password.
+//   2. POST /auth/login. The backend answers with a `role`.
+//   3. The role decides the next page: student -> /student-dashboard, librarian -> /dashboard, admin -> /admin-dashboard.
 function LoginPage({ onLogin, onStudentLogin, onAdminLogin }) {
   const navigate = useNavigate()
+  // Text typed into the login form.
   const [form, setForm] = useState({ identifier: '', password: '' })
+  // Text typed into the activation form (registration number, new password, confirmation).
   const [activationForm, setActivationForm] = useState({ registrationNumber: '', newPassword: '', confirmPassword: '' })
+  // Messages shown to the user, and which form / password-visibility toggles are currently on.
   const [loginError, setLoginError] = useState('')
   const [activationError, setActivationError] = useState('')
   const [activationSuccess, setActivationSuccess] = useState('')
@@ -171,17 +249,20 @@ function LoginPage({ onLogin, onStudentLogin, onAdminLogin }) {
   const [showNewPassword, setShowNewPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
 
+  // Each time the login page opens, clear old text and error messages.
   useEffect(() => {
     resetLoginState()
     resetActivationState()
     setShowActivation(false)
   }, [])
 
+  // Keeps the login form state in step with what the user types (works for any input by using its `name`).
   const handleChange = (event) => {
     const { name, value } = event.target
     setForm((current) => ({ ...current, [name]: value }))
   }
 
+  // Same for the activation form. The registration number is cleaned as it is typed (spaces removed, UPPER CASE).
   const handleActivationChange = (event) => {
     const { name, value } = event.target
     setActivationForm((current) => ({
@@ -190,6 +271,7 @@ function LoginPage({ onLogin, onStudentLogin, onAdminLogin }) {
     }))
   }
 
+  // Empties the activation form and its messages.
   const resetActivationState = () => {
     setActivationError('')
     setActivationSuccess('')
@@ -198,11 +280,13 @@ function LoginPage({ onLogin, onStudentLogin, onAdminLogin }) {
     setShowConfirmPassword(false)
   }
 
+  // Empties the login form and its error message.
   const resetLoginState = () => {
     setLoginError('')
     setForm({ identifier: '', password: '' })
   }
 
+  // Checks the activation form before calling the API. Returns an error message, or '' when everything is fine.
   const validateActivationForm = () => {
     const registrationNumber = normalizeRegistrationNumber(activationForm.registrationNumber)
     const newPassword = activationForm.newPassword.trim()
@@ -223,6 +307,7 @@ function LoginPage({ onLogin, onStudentLogin, onAdminLogin }) {
     return ''
   }
 
+  // Runs when the login form is submitted.
   const handleSubmit = async (event) => {
     event.preventDefault()
 
@@ -235,6 +320,7 @@ function LoginPage({ onLogin, onStudentLogin, onAdminLogin }) {
     }
 
     try {
+      // Send the login details to the backend. A non-OK reply throws, and the message is shown under the form.
       const response = await fetch(`${API_URL}/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -246,6 +332,8 @@ function LoginPage({ onLogin, onStudentLogin, onAdminLogin }) {
 
       setLoginError('')
 
+      // The backend tells us who logged in. Tell App() (which remembers it) and go to that role's home page.
+      // Students also bring back their own record (data.student) so the student pages can show it.
       if (data.role === 'student') {
         onStudentLogin(data.student)
         navigate('/student-dashboard')
@@ -270,6 +358,7 @@ function LoginPage({ onLogin, onStudentLogin, onAdminLogin }) {
     }
   }
 
+  // Runs when the activation form is submitted: validates it, then POST /students/activate to set the student's password.
   const handleActivateAccount = async (event) => {
     event.preventDefault()
 
@@ -308,6 +397,7 @@ function LoginPage({ onLogin, onStudentLogin, onAdminLogin }) {
 
   return (
     <AppShell isLoggedIn={false} onLogout={() => {}} showNav={false}>
+      {/* Login screen: the title and ONE of two forms: the activation form (when showActivation is true) or the normal login form. */}
       <section className="panel auth-panel">
         <div className="auth-copy">
           <h2>Library Login</h2>
@@ -438,14 +528,19 @@ function LoginPage({ onLogin, onStudentLogin, onAdminLogin }) {
 }
 
 // High-level admin screen for searching students and checking system activity.
+// ADMIN HOME (/admin-dashboard)
+// An overview for the administrator. It uses lists that App() already loaded, so it makes no extra API calls.
+// Shows headline numbers, a system summary, and a student search with each student's cards, loans and overdue books.
 function AdminDashboardPage({ students, books, requests, onLogout, notice, noticeTone }) {
   const [studentSearchTerm, setStudentSearchTerm] = useState('')
 
+  // Headline numbers calculated from the request list. A loan is OVERDUE when it is approved and its due date is already in the past.
   const pendingRequests = requests.filter((request) => request.status === 'pending').length
   const approvedLoans = requests.filter((request) => request.status === 'approved').length
   const overdueCount = requests.filter((request) => request.status === 'approved' && request.dueDate && new Date(request.dueDate) < new Date()).length
   const availableBooks = books.filter((book) => book.available).length
 
+  // Student search: nothing is shown until something is typed. Matches part of the registration number OR the full name.
   const filteredStudents = useMemo(() => {
     const query = studentSearchTerm.trim().toLowerCase()
     if (!query) return []
@@ -457,6 +552,8 @@ function AdminDashboardPage({ students, books, requests, onLogout, notice, notic
     })
   }, [students, studentSearchTerm])
 
+  // For one student: finds their requests (stored under the numeric id OR the registration number),
+  // then splits them into 'active unreturned' loans (approved or waiting for return) and the overdue ones (past the due date).
   const getStudentRecords = (student) => {
     const studentRequests = requests.filter((request) => {
       const requestStudentId = String(request.studentId || '')
@@ -478,6 +575,7 @@ function AdminDashboardPage({ students, books, requests, onLogout, notice, notic
 
   return (
     <AppShell isLoggedIn={true} onLogout={onLogout} role="admin" requests={requests}>
+      {/* HERO PANEL: page title and four headline numbers (students, books, pending requests, active loans). */}
       <section className="hero-panel panel">
         <div className="hero-copy">
           <p className="section-kicker">Administration</p>
@@ -493,6 +591,7 @@ function AdminDashboardPage({ students, books, requests, onLogout, notice, notic
         </div>
       </section>
 
+      {/* LIBRARY SUMMARY: the system-status numbers and the administrator's control list. */}
       <section className="panel">
         <SectionHeader title="Library Summary" />
 
@@ -543,6 +642,7 @@ function AdminDashboardPage({ students, books, requests, onLogout, notice, notic
         </div>
       </section>
 
+      {/* STUDENT SEARCH: type a registration number or name to see a student's details, cards, active loans and overdue books. */}
       <section className="panel">
         <SectionHeader title="Search Student" />
 
@@ -617,11 +717,15 @@ function AdminDashboardPage({ students, books, requests, onLogout, notice, notic
   )
 }
 
+// LIBRARIAN HOME (/dashboard)
+// Headline numbers plus the list of pending borrow requests, each with an Approve button.
+// Approve calls handleApprove (defined in App()). NOTE: it also receives `handleReturn`, which App() does not pass and this page does not use.
 function DashboardPage({ students, books, requests, notice, noticeTone, studentId, setStudentId, bookId, setBookId, handleRequestBook, handleApprove, handleReturn, onLogout }) {
   const pendingRequests = requests.filter((request) => request.status === 'pending')
   const approvedRequests = requests.filter((request) => request.status === 'approved')
   const returnedRequests = requests.filter((request) => request.status === 'returned')
 
+  // Counts for the stat cards. A book is 'borrowed' when it is not available.
   const bookStats = {
     total: books.length,
     available: books.filter((book) => book.available).length,
@@ -630,6 +734,7 @@ function DashboardPage({ students, books, requests, notice, noticeTone, studentI
 
   return (
     <AppShell isLoggedIn={true} onLogout={onLogout} requests={requests}>
+      {/* HERO PANEL: title and four headline numbers (students, books, available, borrowed). */}
       <section className="hero-panel panel">
         <div className="hero-copy">
           <h2>Library Management Dashboard</h2>
@@ -646,6 +751,7 @@ function DashboardPage({ students, books, requests, notice, noticeTone, studentI
         </div>
       </section>
 
+      {/* LIBRARIAN DASHBOARD: Quick Stats (pending / approved / returned) and the pending requests that need a decision. */}
       <section className="panel librarian-panel">
         <SectionHeader title="Librarian Dashboard" />
 
@@ -697,9 +803,12 @@ function DashboardPage({ students, books, requests, notice, noticeTone, studentI
   )
 }
 
+// NOTE: this page is defined but no route uses it at the moment; /student-borrow shows StudentRequestPage instead.
+// It is a simpler form where a student id / registration number and a book are entered by hand. Safe to delete, or reuse for staff.
 function StudentBorrowPage({ students, books, studentId, setStudentId, bookId, setBookId, handleRequestBook, onLogout, notice, noticeTone }) {
   return (
     <AppShell isLoggedIn={true} onLogout={onLogout}>
+      {/* REQUEST FORM: student id or registration number plus a book, sent with handleRequestBook. */}
       <section className="panel form-panel">
         <SectionHeader title="Student Borrow Request" />
 
@@ -734,6 +843,7 @@ function StudentBorrowPage({ students, books, studentId, setStudentId, bookId, s
         </form>
       </section>
 
+      {/* BORROWING INFORMATION: reference lists of students and of available books. */}
       <section className="panel">
         <SectionHeader title="Borrowing Information" />
         <div className="request-panels">
@@ -780,17 +890,23 @@ function StudentBorrowPage({ students, books, studentId, setStudentId, bookId, s
 
 // Student dashboard showing personal student record, borrowed books, and return request status.
 // The student dashboard shows their personal borrowing activity and allows return requests.
+// STUDENT HOME (/student-dashboard)
+// What a logged-in student sees: their own details and every request they have made.
+// Props: `student` is the record returned at login, `requests` is the full request list, handleReturnRequest asks to return a book.
 function StudentDashboardPage({ student, requests, onLogout, notice, noticeTone, handleReturnRequest }) {
+  // Keep only THIS student's requests. Requests may store the student as the numeric id OR the registration number, so both are matched.
   const studentRequests = requests.filter((request) => {
     const requestStudentId = String(request.studentId)
     return requestStudentId === String(student.id) || requestStudentId === String(student.registrationNumber)
   })
 
+  // Loans the student currently holds (approved) and books already brought back (returned), for the stat cards.
   const activeLoans = studentRequests.filter((request) => request.status === 'approved')
   const returnedLoans = studentRequests.filter((request) => request.status === 'returned')
 
   return (
     <AppShell isLoggedIn={true} onLogout={onLogout} role="student">
+      {/* HERO PANEL: welcome message and three numbers (books borrowed, active loans, returned). */}
       <section className="panel hero-panel">
         <div className="hero-copy">
           <p className="section-kicker">Student Portal</p>
@@ -805,6 +921,7 @@ function StudentDashboardPage({ student, requests, onLogout, notice, noticeTone,
         </div>
       </section>
 
+      {/* MY INFORMATION: the logged-in student's own details. */}
       <section className="panel">
         <SectionHeader title="My Information" />
         <div className="catalog-list">
@@ -840,6 +957,7 @@ function StudentDashboardPage({ student, requests, onLogout, notice, noticeTone,
         </div>
       </section>
 
+      {/* MY BORROW RECORDS: every request the student made. An approved loan shows a Return button; the other statuses show a label. */}
       <section className="panel">
         <SectionHeader title="My Borrow Records" />
         <div className="request-list">
@@ -874,17 +992,22 @@ function StudentDashboardPage({ student, requests, onLogout, notice, noticeTone,
   )
 }
 
+// BORROW A BOOK (/student-borrow), student only
+// Steps for the student: 1) search by title or author, 2) click ONE available book in the results, 3) press "Request Book".
+// `selectedBookId` remembers which result is clicked; `searchTerm` is the text in the search box.
 function StudentRequestPage({ books, onLogout, notice, noticeTone, bookId, setBookId, handleRequestBook }) {
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedBookId, setSelectedBookId] = useState('')
 
   useEffect(() => {
+    // Cleanup: when the student leaves this page, forget the selected book so it is not still selected next time.
     return () => {
       setSelectedBookId('')
       setBookId('')
     }
   }, [setBookId])
 
+  // Search results: nothing until something is typed, then every book whose title or author contains the text.
   const filteredBooks = useMemo(() => {
     const query = searchTerm.trim().toLowerCase()
 
@@ -898,11 +1021,13 @@ function StudentRequestPage({ books, onLogout, notice, noticeTone, bookId, setBo
     })
   }, [books, searchTerm])
 
+  // The full book record for the clicked result (found by id or accession number). It controls whether the Request button is enabled.
   const selectedBook = books.find((book) => {
     return String(book.id) === String(selectedBookId || '') || String(book.accessionNumber) === String(selectedBookId || '')
   })
 
   useEffect(() => {
+    // If the search box is cleared, also clear the selected book.
     if (!searchTerm.trim()) {
       setSelectedBookId('')
     }
@@ -912,6 +1037,7 @@ function StudentRequestPage({ books, onLogout, notice, noticeTone, bookId, setBo
 
   return (
     <AppShell isLoggedIn={true} onLogout={onLogout} role="student">
+      {/* REQUEST A BOOK: search box, the clickable list of matching books (unavailable books are disabled) and the Request Book button. */}
       <section className="panel form-panel">
         <SectionHeader title="Request a Book" />
 
@@ -990,9 +1116,12 @@ function StudentRequestPage({ books, onLogout, notice, noticeTone, bookId, setBo
   )
 }
 
+// STUDENTS (/students), librarian only
+// Top: the "Register Student" form (handleStudentSubmit). Bottom: search registered students by registration number.
 function StudentsPage({ students, books, requests, studentForm, handleStudentChange, handleStudentSubmit, onLogout, notice, noticeTone }) {
   const [studentSearchTerm, setStudentSearchTerm] = useState('')
 
+  // Matches part of the registration number typed in the search box.
   const filteredStudents = useMemo(() => {
     const query = studentSearchTerm.trim().toLowerCase()
     if (!query) return students
@@ -1003,6 +1132,7 @@ function StudentsPage({ students, books, requests, studentForm, handleStudentCha
     })
   }, [students, studentSearchTerm])
 
+  // Same helper as on the admin page: a student's active unreturned loans and overdue loans.
   const getStudentRecords = (student) => {
     const studentRequests = requests.filter((request) => {
       const requestStudentId = String(request.studentId || '')
@@ -1024,6 +1154,7 @@ function StudentsPage({ students, books, requests, studentForm, handleStudentCha
 
   return (
     <AppShell isLoggedIn={true} onLogout={onLogout}>
+      {/* REGISTRATION FORM: registration number, name, faculty, department, category (and optional password). Validated, then sent to the API. */}
       <section className="panel form-panel">
         <SectionHeader title="Student Registration" />
 
@@ -1090,6 +1221,7 @@ function StudentsPage({ students, books, requests, studentForm, handleStudentCha
         </form>
       </section>
 
+      {/* REGISTERED STUDENTS: search by registration number; each match shows the student's loans and overdue books. */}
       <section className="panel">
         <SectionHeader title="Registered Students" />
 
@@ -1164,7 +1296,11 @@ function StudentsPage({ students, books, requests, studentForm, handleStudentCha
   )
 }
 
+// LIBRARY INVENTORY (/admin-books), admin only
+// Search box, the "Add Book" form (handleBookSubmit) and the list of all books with their availability.
+// BooksPage below is the same screen for librarians (/books).
 function AdminInventoryPage({ books, bookForm, searchTerm, setSearchTerm, handleBookChange, handleBookSubmit, onLogout, notice, noticeTone }) {
+  // Search over title, author, call number and accession number. With an empty search box ALL books are shown.
   const filteredBooks = useMemo(() => {
     const query = searchTerm.trim().toLowerCase()
     if (!query) return books
@@ -1177,6 +1313,7 @@ function AdminInventoryPage({ books, bookForm, searchTerm, setSearchTerm, handle
 
   return (
     <AppShell isLoggedIn={true} onLogout={onLogout} role="admin">
+      {/* LIBRARY INVENTORY: search toolbar, the add-book form and the list of all books. */}
       <section className="panel catalog-panel">
         <SectionHeader title="Library Inventory" />
 
@@ -1283,7 +1420,9 @@ function AdminInventoryPage({ books, bookForm, searchTerm, setSearchTerm, handle
   )
 }
 
+// BOOK CATALOG (/books), librarian only. Same layout and behaviour as AdminInventoryPage above.
 function BooksPage({ books, bookForm, searchTerm, setSearchTerm, handleBookChange, handleBookSubmit, onLogout, notice, noticeTone }) {
+  // Search over title, author, call number and accession number (empty search shows everything).
   const filteredBooks = useMemo(() => {
     const query = searchTerm.trim().toLowerCase()
     if (!query) return books
@@ -1296,6 +1435,7 @@ function BooksPage({ books, bookForm, searchTerm, setSearchTerm, handleBookChang
 
   return (
     <AppShell isLoggedIn={true} onLogout={onLogout}>
+      {/* BOOK CATALOG: search toolbar, the add-book form and the list of all books. */}
       <section className="panel catalog-panel">
         <SectionHeader title="Book Catalog" />
 
@@ -1402,9 +1542,11 @@ function BooksPage({ books, bookForm, searchTerm, setSearchTerm, handleBookChang
   )
 }
 
+// TRANSACTION HISTORY (/admin-borrow-records), admin only: a read-only list of every request with its status, student, book and due date.
 function AdminBorrowRecordsPage({ requests, onLogout }) {
   return (
     <AppShell isLoggedIn={true} onLogout={onLogout} role="admin" requests={requests}>
+      {/* TRANSACTION HISTORY: one row per request. The status in capitals is followed by the request number. */}
       <section className="panel">
         <SectionHeader title="Transaction History" />
         <div className="request-list">
@@ -1438,9 +1580,11 @@ function AdminBorrowRecordsPage({ requests, onLogout }) {
   )
 }
 
+// BORROW REQUESTS (/borrow-records), librarian only: every request, with action buttons for the librarian (approve, etc.) depending on its status.
 function BorrowRecordsPage({ requests, handleApprove, handleReturnRequest, handleApproveReturn, onLogout }) {
   return (
     <AppShell isLoggedIn={true} onLogout={onLogout} requests={requests}>
+      {/* BORROW REQUESTS: one row per request, with the actions the librarian can take. */}
       <section className="panel">
         <SectionHeader title="Borrow Requests" />
         <div className="request-list">
@@ -1476,13 +1620,16 @@ function BorrowRecordsPage({ requests, handleApprove, handleReturnRequest, handl
   )
 }
 
+// OVERDUE BOOKS (/admin-overdue), admin only: loans that are approved and whose due date has already passed.
 function AdminOverduePage({ requests, onLogout }) {
+  // Overdue = status 'approved' AND a due date AND that date is before right now.
   const overdueRequests = requests.filter((request) => {
     return request.status === 'approved' && request.dueDate && new Date(request.dueDate) < new Date()
   })
 
   return (
     <AppShell isLoggedIn={true} onLogout={onLogout} role="admin" requests={requests}>
+      {/* OVERDUE BOOKS: the overdue loans, or a short message when there are none. */}
       <section className="panel">
         <SectionHeader title="Overdue Books" />
         <div className="request-list">
@@ -1507,13 +1654,18 @@ function AdminOverduePage({ requests, onLogout }) {
   )
 }
 
+// RETURNS MANAGEMENT (/returns), librarian only
+// Three columns that follow a loan through the return process:
+//   Active Loans -> Return Requests (student asked to return; librarian presses "Approve Return") -> Returned Books
 function ReturnsPage({ requests, handleApproveReturn, onLogout }) {
+  // Split the request list into the three groups shown on this page.
   const returnRequests = requests.filter((request) => request.status === 'return_requested')
   const returnedRequests = requests.filter((request) => request.status === 'returned')
   const activeLoans = requests.filter((request) => request.status === 'approved')
 
   return (
     <AppShell isLoggedIn={true} onLogout={onLogout} requests={requests}>
+      {/* RETURNS MANAGEMENT: Active Loans, Return Requests (with the Approve Return button) and Returned Books. */}
       <section className="panel">
         <SectionHeader title="Returns Management" />
 
@@ -1580,22 +1732,38 @@ function ReturnsPage({ requests, handleApproveReturn, onLogout }) {
 }
 
 // Main application component: it fetches data, handles authentication, and defines all routes.
+// =====================================================================
+//  App()  -  THE BRAIN OF THE FRONTEND
+// =====================================================================
+//  App() is the root component. It:
+//    1. keeps all shared data in state (students, books, requests, forms, login, message banner),
+//    2. loads that data from the backend,
+//    3. owns every action handler (register student, add book, request, approve, return...),
+//    4. decides which page to show for each address (the route table at the bottom).
+//  Pages never call the API themselves for lists; they receive data and handlers as props.
 function App() {
+  // DATA LISTS loaded from the API.
   const [students, setStudents] = useState([])
   const [books, setBooks] = useState([])
   const [requests, setRequests] = useState([])
+  // FORM AND SEARCH VALUES shared between pages: the register-student form, the add-book form, the book search box, and the student / book chosen in the borrow form.
   const [studentForm, setStudentForm] = useState(EMPTY_STUDENT_FORM)
   const [bookForm, setBookForm] = useState(EMPTY_BOOK_FORM)
   const [searchTerm, setSearchTerm] = useState('')
   const [studentId, setStudentId] = useState('')
   const [bookId, setBookId] = useState('')
+  // MESSAGE BANNER: the green (success) or red (error) text at the top of a page. `() => ...` runs only once,
+  // to restore a saved message after a refresh.
   const [notice, setNotice] = useState(() => readStoredNotice().message)
   const [noticeTone, setNoticeTone] = useState(() => readStoredNotice().tone)
+  // LOGIN STATE: whether someone is logged in, their role, and (for students) their own record. Restored from localStorage on start.
   const [isLoggedIn, setIsLoggedIn] = useState(() => readStoredAuth().isLoggedIn)
   const [userRole, setUserRole] = useState(() => readStoredAuth().userRole)
   const [activeStudent, setActiveStudent] = useState(() => readStoredAuth().activeStudent || null)
+  // Holds the timer that hides the message after 5 seconds, so a new message can cancel the old timer.
   const noticeTimeoutRef = useRef(null)
 
+  // Three loaders: GET /students, GET /books and GET /requests. Each stores the result in state, or shows a red message if the API cannot be reached.
   const fetchStudents = async () => {
     try {
       const response = await fetch(`${API_URL}/students`)
@@ -1632,10 +1800,12 @@ function App() {
     }
   }
 
+  // Reloads all three lists at the same time. Called once at start-up and after EVERY change, so every page shows the latest data.
   const refreshAll = async () => {
     await Promise.all([fetchStudents(), fetchBooks(), fetchRequests()])
   }
 
+  // Hides the message banner and removes the saved copy.
   const clearNotice = () => {
     if (noticeTimeoutRef.current) {
       clearTimeout(noticeTimeoutRef.current)
@@ -1647,6 +1817,7 @@ function App() {
     sessionStorage.removeItem(NOTICE_STORAGE_KEY)
   }
 
+  // Logs out: forget who was logged in (in memory and in localStorage) and hide any message.
   const handleLogout = () => {
     setIsLoggedIn(false)
     setUserRole(null)
@@ -1655,6 +1826,7 @@ function App() {
     clearNotice()
   }
 
+  // On first load: restore the saved login (so refresh keeps you logged in). If nothing valid is saved, make sure we are logged out.
   useEffect(() => {
     const auth = readStoredAuth()
     const restoredNotice = readStoredNotice()
@@ -1676,6 +1848,7 @@ function App() {
     }
   }, [])
 
+  // Whenever the login information changes, save it to localStorage so it survives a refresh.
   useEffect(() => {
     localStorage.setItem(
       AUTH_STORAGE_KEY,
@@ -1683,6 +1856,7 @@ function App() {
     )
   }, [isLoggedIn, userRole, activeStudent])
 
+  // On first load: drop any stale saved message and load the data from the API.
   useEffect(() => {
     if (!notice) {
       sessionStorage.removeItem(NOTICE_STORAGE_KEY)
@@ -1691,6 +1865,7 @@ function App() {
     refreshAll()
   }, [])
 
+  // Keeps the register-student form in step with typing (the registration number is cleaned as it is typed).
   const handleStudentChange = (event) => {
     const { name, value } = event.target
     setStudentForm((current) => ({
@@ -1699,11 +1874,13 @@ function App() {
     }))
   }
 
+  // Keeps the add-book form in step with typing.
   const handleBookChange = (event) => {
     const { name, value } = event.target
     setBookForm((current) => ({ ...current, [name]: value }))
   }
 
+  // Shows a message banner ('success' is green, 'error' is red) and hides it again after 5 seconds. The text is saved in sessionStorage so a refresh does not lose it.
   const showNotice = (message, tone = 'success') => {
     if (noticeTimeoutRef.current) {
       clearTimeout(noticeTimeoutRef.current)
@@ -1724,6 +1901,7 @@ function App() {
     sessionStorage.removeItem(NOTICE_STORAGE_KEY)
   }
 
+  // Steps: 1) check the registration-number format, 2) POST /students, 3) show a message, 4) empty the form, 5) reload the lists.
   // Register a new student through the librarian flow.
   const handleStudentSubmit = async (event) => {
     event.preventDefault()
@@ -1752,6 +1930,7 @@ function App() {
     }
   }
 
+  // Steps: POST /books with the form values, show 'Book ... added', empty the form, reload the lists.
   // Add a new book to the inventory.
   const handleBookSubmit = async (event) => {
     event.preventDefault()
@@ -1774,6 +1953,13 @@ function App() {
     }
   }
 
+  // Steps for a borrow request:
+  //   1. A student must still be logged in; otherwise log out and show an error.
+  //   2. Work out WHO is asking: a student uses their own registration number; staff use the id they typed.
+  //   3. Work out WHICH book: the clicked book, or the book chosen in the form.
+  //   4. Check in the browser first (a book is chosen and it is available) to give quick feedback.
+  //   5. POST /requests. The backend repeats the checks and enforces the borrow limit.
+  //   6. Show a message and reload the lists.
   // Submit a borrow request after validating that the selected book is available.
   const handleRequestBook = async (event, selectedBookIdOverride = null) => {
     event.preventDefault()
@@ -1830,6 +2016,7 @@ function App() {
     }
   }
 
+  // Safety check before approve / return: re-load /requests and confirm the request still exists, in case the list on screen is out of date.
   const requestExistsInLatestData = async (requestId) => {
     try {
       const response = await fetch(`${API_URL}/requests`)
@@ -1842,6 +2029,7 @@ function App() {
     }
   }
 
+  // PATCH /requests/:id/approve: the librarian approves a pending request (the backend sets the due date and marks the book unavailable).
   // Librarian approves an outstanding borrow request and sets the due date.
   const handleApprove = async (requestId) => {
     try {
@@ -1866,6 +2054,7 @@ function App() {
     }
   }
 
+  // PATCH /requests/:id/return: the student says they are returning a book. The status becomes 'return_requested'.
   // Student requests a return for a book that has already been approved and borrowed.
   const handleReturnRequest = async (requestId) => {
     try {
@@ -1890,6 +2079,7 @@ function App() {
     }
   }
 
+  // PATCH /requests/:id/approve-return: the librarian confirms the book is back (status 'returned', the book is available again).
   // Librarian confirms a returned book and marks the request as complete.
   const handleApproveReturn = async (requestId) => {
     try {
@@ -1913,14 +2103,21 @@ function App() {
     }
   }
 
+  // ROUTE TABLE: the address in the browser decides which page is shown.
+  // Each protected route follows the same pattern:
+  //    isLoggedIn && userRole === '<role>'  ?  <the page>  :  <Navigate to="/login" />
+  // so someone who is not logged in (or has the wrong role) is sent back to the login page.
   // Route setup: all pages are protected by role-based access checks.
   return (
     <BrowserRouter>
       <Routes>
+        {/* ROOT: opening the bare website address redirects to the login page. */}
         <Route
           path="/"
           element={<Navigate to="/login" replace />}
         />
+        {/* LOGIN PAGE. The three callbacks record who logged in (and clear any old message):
+             onLogin -> librarian    onAdminLogin -> admin    onStudentLogin(student) -> student, and keeps that student's record */}
         <Route
           path="/login"
           element={
@@ -1944,6 +2141,7 @@ function App() {
             />
           }
         />
+        {/* ADMIN HOME. Admin only. */}
         <Route
           path="/admin-dashboard"
           element={
@@ -1961,6 +2159,7 @@ function App() {
             )
           }
         />
+        {/* LIBRARIAN HOME: pending requests and quick stats. Librarian only. */}
         <Route
           path="/dashboard"
           element={
@@ -1986,6 +2185,7 @@ function App() {
             )
           }
         />
+        {/* STUDENT HOME: the student's own details and borrow records. Needs a logged-in student with a saved record. */}
         <Route
           path="/student-dashboard"
           element={
@@ -2006,6 +2206,7 @@ function App() {
             )
           }
         />
+        {/* STUDENT BORROW PAGE (search and request a book). Students only; a logged-in non-student is sent to /dashboard instead of /login. */}
         <Route
           path="/student-borrow"
           element={
@@ -2026,6 +2227,7 @@ function App() {
             )
           }
         />
+        {/* REGISTER AND SEARCH STUDENTS. Librarian only. */}
         <Route
           path="/students"
           element={
@@ -2046,6 +2248,7 @@ function App() {
             )
           }
         />
+        {/* INVENTORY (admin): search, add and list books. */}
         <Route
           path="/admin-books"
           element={
@@ -2066,6 +2269,7 @@ function App() {
             )
           }
         />
+        {/* BOOK CATALOG (librarian): search, add and list books. */}
         <Route
           path="/books"
           element={
@@ -2086,6 +2290,7 @@ function App() {
             )
           }
         />
+        {/* TRANSACTION HISTORY (admin, read-only). */}
         <Route
           path="/admin-borrow-records"
           element={
@@ -2099,6 +2304,7 @@ function App() {
             )
           }
         />
+        {/* BORROW REQUESTS (librarian): approve and follow up requests. */}
         <Route
           path="/borrow-records"
           element={
@@ -2115,6 +2321,7 @@ function App() {
             )
           }
         />
+        {/* OVERDUE BOOKS (admin). */}
         <Route
           path="/admin-overdue"
           element={
@@ -2125,6 +2332,7 @@ function App() {
             )
           }
         />
+        {/* RETURNS MANAGEMENT (librarian): confirm returned books. */}
         <Route
           path="/returns"
           element={
@@ -2140,4 +2348,5 @@ function App() {
   )
 }
 
+// App is the root component; main.jsx renders it into the page.
 export default App
