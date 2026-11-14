@@ -718,9 +718,9 @@ function AdminDashboardPage({ students, books, requests, onLogout, notice, notic
 }
 
 // LIBRARIAN HOME (/dashboard)
-// Headline numbers plus the list of pending borrow requests, each with an Approve button.
-// Approve calls handleApprove (defined in App()). NOTE: it also receives `handleReturn`, which App() does not pass and this page does not use.
-function DashboardPage({ students, books, requests, notice, noticeTone, studentId, setStudentId, bookId, setBookId, handleRequestBook, handleApprove, handleReturn, onLogout }) {
+// Headline numbers plus the list of pending borrow requests, each with Approve and Reject buttons.
+// Approve calls handleApprove and Reject calls handleReject (both defined in App()). NOTE: it also receives `handleReturn`, which App() does not pass and this page does not use.
+function DashboardPage({ students, books, requests, notice, noticeTone, studentId, setStudentId, bookId, setBookId, handleRequestBook, handleApprove, handleReject, handleReturn, onLogout }) {
   const pendingRequests = requests.filter((request) => request.status === 'pending')
   const approvedRequests = requests.filter((request) => request.status === 'approved')
   const returnedRequests = requests.filter((request) => request.status === 'returned')
@@ -734,6 +734,9 @@ function DashboardPage({ students, books, requests, notice, noticeTone, studentI
 
   return (
     <AppShell isLoggedIn={true} onLogout={onLogout} requests={requests}>
+      {/* MESSAGE BANNER: success (green) or error (red) text from the last action; it hides itself after 5 seconds. */}
+      {notice && <div className={`status-banner ${noticeTone}`}>{notice}</div>}
+
       {/* HERO PANEL: title and four headline numbers (students, books, available, borrowed). */}
       <section className="hero-panel panel">
         <div className="hero-copy">
@@ -789,9 +792,14 @@ function DashboardPage({ students, books, requests, notice, noticeTone, studentI
                       <p>Student: {request.studentId}</p>
                       <p>Book: {request.bookId}</p>
                     </div>
-                    <button type="button" className="action-button approve" onClick={() => handleApprove(request.id)}>
-                      Approve
-                    </button>
+                    <div className="row-actions">
+                      <button type="button" className="action-button approve" onClick={() => handleApprove(request.id)}>
+                        Approve
+                      </button>
+                      <button type="button" className="action-button reject" onClick={() => handleReject(request.id)}>
+                        Reject
+                      </button>
+                    </div>
                   </div>
                 ))
               )}
@@ -892,8 +900,8 @@ function StudentBorrowPage({ students, books, studentId, setStudentId, bookId, s
 // The student dashboard shows their personal borrowing activity and allows return requests.
 // STUDENT HOME (/student-dashboard)
 // What a logged-in student sees: their own details and every request they have made.
-// Props: `student` is the record returned at login, `requests` is the full request list, handleReturnRequest asks to return a book.
-function StudentDashboardPage({ student, requests, onLogout, notice, noticeTone, handleReturnRequest }) {
+// Props: `student` is the record returned at login, `requests` is the full request list, handleReturnRequest asks to return a book, handleCancelRequest withdraws a pending request.
+function StudentDashboardPage({ student, requests, onLogout, notice, noticeTone, handleReturnRequest, handleCancelRequest }) {
   // Keep only THIS student's requests. Requests may store the student as the numeric id OR the registration number, so both are matched.
   const studentRequests = requests.filter((request) => {
     const requestStudentId = String(request.studentId)
@@ -906,6 +914,9 @@ function StudentDashboardPage({ student, requests, onLogout, notice, noticeTone,
 
   return (
     <AppShell isLoggedIn={true} onLogout={onLogout} role="student">
+      {/* MESSAGE BANNER: success (green) or error (red) text from the last action; it hides itself after 5 seconds. */}
+      {notice && <div className={`status-banner ${noticeTone}`}>{notice}</div>}
+
       {/* HERO PANEL: welcome message and three numbers (books borrowed, active loans, returned). */}
       <section className="panel hero-panel">
         <div className="hero-copy">
@@ -915,7 +926,8 @@ function StudentDashboardPage({ student, requests, onLogout, notice, noticeTone,
         </div>
 
         <div className="stats-grid">
-          <StatCard label="Books Borrowed" value={studentRequests.length} accent="blue" />
+          {/* Rejected and cancelled requests were never borrowed, so they are not counted here. */}
+          <StatCard label="Books Borrowed" value={studentRequests.filter((request) => !['rejected', 'cancelled'].includes(request.status)).length} accent="blue" />
           <StatCard label="Active Loans" value={activeLoans.length} accent="green" />
           <StatCard label="Returned" value={returnedLoans.length} accent="purple" />
         </div>
@@ -957,7 +969,7 @@ function StudentDashboardPage({ student, requests, onLogout, notice, noticeTone,
         </div>
       </section>
 
-      {/* MY BORROW RECORDS: every request the student made. An approved loan shows a Return button; the other statuses show a label. */}
+      {/* MY BORROW RECORDS: every request the student made. An approved loan shows a Return button, a pending request shows Cancel request, the other statuses show a label. */}
       <section className="panel">
         <SectionHeader title="My Borrow Records" />
         <div className="request-list">
@@ -969,7 +981,7 @@ function StudentDashboardPage({ student, requests, onLogout, notice, noticeTone,
                 <div>
                   <strong>{request.status.toUpperCase()} #{request.id}</strong>
                   <p>Book: {request.bookId}</p>
-                  <p>Due: {request.dueDate ? new Date(request.dueDate).toLocaleDateString() : 'Pending approval'}</p>
+                  <p>Due: {request.dueDate ? new Date(request.dueDate).toLocaleDateString() : request.status === 'pending' ? 'Pending approval' : 'Not applicable'}</p>
                 </div>
 
                 {request.status === 'approved' ? (
@@ -978,6 +990,14 @@ function StudentDashboardPage({ student, requests, onLogout, notice, noticeTone,
                   </button>
                 ) : request.status === 'return_requested' ? (
                   <span className="status-pill returned">Return requested</span>
+                ) : request.status === 'pending' ? (
+                  <button type="button" className="action-button cancel" onClick={() => handleCancelRequest(request.id)}>
+                    Cancel request
+                  </button>
+                ) : request.status === 'rejected' ? (
+                  <span className="status-pill rejected">Rejected</span>
+                ) : request.status === 'cancelled' ? (
+                  <span className="status-pill cancelled">Cancelled</span>
                 ) : (
                   <span className={`status-pill ${request.status === 'returned' ? 'returned' : ''}`}>
                     {request.status}
@@ -1037,6 +1057,9 @@ function StudentRequestPage({ books, onLogout, notice, noticeTone, bookId, setBo
 
   return (
     <AppShell isLoggedIn={true} onLogout={onLogout} role="student">
+      {/* MESSAGE BANNER: success (green) or error (red) text from the last action; it hides itself after 5 seconds. */}
+      {notice && <div className={`status-banner ${noticeTone}`}>{notice}</div>}
+
       {/* REQUEST A BOOK: search box, the clickable list of matching books (unavailable books are disabled) and the Request Book button. */}
       <section className="panel form-panel">
         <SectionHeader title="Request a Book" />
@@ -1070,8 +1093,10 @@ function StudentRequestPage({ books, onLogout, notice, noticeTone, bookId, setBo
               visibleBooks.map((book) => {
                 const requestStatus = book.requestStatus || (book.available ? 'available' : 'borrowed');
                 const isSelectable = ['available', 'returned'].includes(requestStatus)
+                // A book that someone has requested (waiting for the librarian) is labelled "Requested";
+                // approved / return-requested books stay "Not available".
                 const statusLabel = requestStatus === 'pending'
-                  ? 'Not available'
+                  ? 'Requested'
                   : requestStatus === 'approved'
                     ? 'Not available'
                     : requestStatus === 'return_requested'
@@ -1098,7 +1123,7 @@ function StudentRequestPage({ books, onLogout, notice, noticeTone, bookId, setBo
                       <p>Author: {book.author}</p>
                       <p>Accession: {book.accessionNumber}</p>
                     </div>
-                    <span className={`status-pill ${requestStatus === 'pending' || requestStatus === 'approved' || requestStatus === 'return_requested' ? 'borrowed' : book.available ? 'available' : 'borrowed'}`}>
+                    <span className={`status-pill ${requestStatus === 'pending' ? 'requested' : requestStatus === 'approved' || requestStatus === 'return_requested' ? 'borrowed' : book.available ? 'available' : 'borrowed'}`}>
                       {statusLabel}
                     </span>
                   </button>
@@ -1393,8 +1418,8 @@ function AdminInventoryPage({ books, bookForm, searchTerm, setSearchTerm, handle
               <article className="book-item" key={book.id}>
                 <div>
                   <div className="book-meta">
-                    <span className={`status-pill ${book.available ? 'available' : 'borrowed'}`}>
-                      {book.available ? 'Available' : 'Not available'}
+                    <span className={`status-pill ${book.requestStatus === 'pending' ? 'requested' : book.available ? 'available' : 'borrowed'}`}>
+                      {book.requestStatus === 'pending' ? 'Requested' : book.available ? 'Available' : 'Not available'}
                     </span>
                   </div>
                   <h3>{book.title}</h3>
@@ -1515,8 +1540,8 @@ function BooksPage({ books, bookForm, searchTerm, setSearchTerm, handleBookChang
               <article className="book-item" key={book.id}>
                 <div>
                   <div className="book-meta">
-                    <span className={`status-pill ${book.available ? 'available' : 'borrowed'}`}>
-                      {book.available ? 'Available' : 'Borrowed'}
+                    <span className={`status-pill ${book.requestStatus === 'pending' ? 'requested' : book.available ? 'available' : 'borrowed'}`}>
+                      {book.requestStatus === 'pending' ? 'Requested' : book.available ? 'Available' : 'Borrowed'}
                     </span>
                   </div>
                   <h3>{book.title}</h3>
@@ -1568,6 +1593,10 @@ function AdminBorrowRecordsPage({ requests, onLogout }) {
                   <span className="status-pill available">Approved</span>
                 ) : request.status === 'return_requested' ? (
                   <span className="status-pill returned">Return Requested</span>
+                ) : request.status === 'rejected' ? (
+                  <span className="status-pill rejected">Rejected</span>
+                ) : request.status === 'cancelled' ? (
+                  <span className="status-pill cancelled">Cancelled</span>
                 ) : (
                   <span className="status-pill returned">Returned</span>
                 )}
@@ -1580,11 +1609,14 @@ function AdminBorrowRecordsPage({ requests, onLogout }) {
   )
 }
 
-// BORROW REQUESTS (/borrow-records), librarian only: every request, with action buttons for the librarian (approve, etc.) depending on its status.
-function BorrowRecordsPage({ requests, handleApprove, handleReturnRequest, handleApproveReturn, onLogout }) {
+// BORROW REQUESTS (/borrow-records), librarian only: every request. A pending request has Approve and Reject buttons; the other statuses show a label.
+function BorrowRecordsPage({ requests, handleApprove, handleReject, handleReturnRequest, handleApproveReturn, onLogout, notice, noticeTone }) {
   return (
     <AppShell isLoggedIn={true} onLogout={onLogout} requests={requests}>
-      {/* BORROW REQUESTS: one row per request, with the actions the librarian can take. */}
+      {/* MESSAGE BANNER: success (green) or error (red) text from the last action; it hides itself after 5 seconds. */}
+      {notice && <div className={`status-banner ${noticeTone}`}>{notice}</div>}
+
+      {/* BORROW REQUESTS: one row per request. Pending ones have Approve / Reject buttons. */}
       <section className="panel">
         <SectionHeader title="Borrow Requests" />
         <div className="request-list">
@@ -1601,13 +1633,22 @@ function BorrowRecordsPage({ requests, handleApprove, handleReturnRequest, handl
                 </div>
 
                 {request.status === 'pending' ? (
-                  <button type="button" className="action-button approve" onClick={() => handleApprove(request.id)}>
-                    Approve
-                  </button>
+                  <div className="row-actions">
+                    <button type="button" className="action-button approve" onClick={() => handleApprove(request.id)}>
+                      Approve
+                    </button>
+                    <button type="button" className="action-button reject" onClick={() => handleReject(request.id)}>
+                      Reject
+                    </button>
+                  </div>
                 ) : request.status === 'approved' ? (
                   <span className="status-pill available">Approved</span>
                 ) : request.status === 'return_requested' ? (
                   <span className="status-pill returned">Return Requested</span>
+                ) : request.status === 'rejected' ? (
+                  <span className="status-pill rejected">Rejected</span>
+                ) : request.status === 'cancelled' ? (
+                  <span className="status-pill cancelled">Cancelled</span>
                 ) : (
                   <span className="status-pill returned">Returned</span>
                 )}
@@ -1657,7 +1698,7 @@ function AdminOverduePage({ requests, onLogout }) {
 // RETURNS MANAGEMENT (/returns), librarian only
 // Three columns that follow a loan through the return process:
 //   Active Loans -> Return Requests (student asked to return; librarian presses "Approve Return") -> Returned Books
-function ReturnsPage({ requests, handleApproveReturn, onLogout }) {
+function ReturnsPage({ requests, handleApproveReturn, onLogout, notice, noticeTone }) {
   // Split the request list into the three groups shown on this page.
   const returnRequests = requests.filter((request) => request.status === 'return_requested')
   const returnedRequests = requests.filter((request) => request.status === 'returned')
@@ -1665,6 +1706,9 @@ function ReturnsPage({ requests, handleApproveReturn, onLogout }) {
 
   return (
     <AppShell isLoggedIn={true} onLogout={onLogout} requests={requests}>
+      {/* MESSAGE BANNER: success (green) or error (red) text from the last action; it hides itself after 5 seconds. */}
+      {notice && <div className={`status-banner ${noticeTone}`}>{notice}</div>}
+
       {/* RETURNS MANAGEMENT: Active Loans, Return Requests (with the Approve Return button) and Returned Books. */}
       <section className="panel">
         <SectionHeader title="Returns Management" />
@@ -2051,6 +2095,7 @@ function App() {
       await refreshAll()
     } catch (error) {
       showNotice(error.message, 'error')
+      await refreshAll() // the list on screen may be out of date (e.g. the student cancelled first)
     }
   }
 
@@ -2100,6 +2145,66 @@ function App() {
       await refreshAll()
     } catch (error) {
       showNotice(error.message, 'error')
+    }
+  }
+
+  // PATCH /requests/:id/reject: the librarian refuses a pending request. The request is closed as 'rejected',
+  // it stops counting against the student's borrow limit and the book can be requested again.
+  const handleRejectRequest = async (requestId) => {
+    // Ask first, so a mis-click does not reject a request by accident.
+    if (!window.confirm(`Reject request #${requestId}? The student will be able to request this book again.`)) {
+      return
+    }
+
+    try {
+      const exists = await requestExistsInLatestData(requestId)
+      if (!exists) {
+        await refreshAll()
+        showNotice('This request is no longer available. Please refresh the list.', 'error')
+        return
+      }
+
+      const response = await fetch(`${API_URL}/requests/${requestId}/reject`, {
+        method: 'PATCH',
+      })
+
+      const data = await response.json()
+      if (!response.ok) throw new Error(data.message || 'Unable to reject request')
+
+      showNotice(`Request #${requestId} rejected.`)
+      await refreshAll()
+    } catch (error) {
+      showNotice(error.message, 'error')
+      await refreshAll() // the list on screen may be out of date (e.g. the student cancelled first)
+    }
+  }
+
+  // PATCH /requests/:id/cancel: a student withdraws their OWN pending request ('cancelled').
+  // The student's registration number is sent so the backend can check the request really belongs to them.
+  const handleCancelRequest = async (requestId) => {
+    if (!window.confirm(`Cancel your request #${requestId}?`)) {
+      return
+    }
+
+    try {
+      if (!activeStudent?.registrationNumber) {
+        throw new Error('Please log in again to cancel a request.')
+      }
+
+      const response = await fetch(`${API_URL}/requests/${requestId}/cancel`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ studentId: activeStudent.registrationNumber }),
+      })
+
+      const data = await response.json()
+      if (!response.ok) throw new Error(data.message || 'Unable to cancel request')
+
+      showNotice(`Request #${requestId} cancelled.`)
+      await refreshAll()
+    } catch (error) {
+      showNotice(error.message, 'error')
+      await refreshAll() // the list on screen may be out of date (e.g. the librarian already approved it)
     }
   }
 
@@ -2176,6 +2281,7 @@ function App() {
                 setBookId={setBookId}
                 handleRequestBook={handleRequestBook}
                 handleApprove={handleApprove}
+                handleReject={handleRejectRequest}
                 handleReturnRequest={handleReturnRequest}
                 handleApproveReturn={handleApproveReturn}
                 onLogout={handleLogout}
@@ -2199,6 +2305,7 @@ function App() {
                 setBookId={setBookId}
                 handleRequestBook={handleRequestBook}
                 handleReturnRequest={handleReturnRequest}
+                handleCancelRequest={handleCancelRequest}
                 onLogout={handleLogout}
               />
             ) : (
@@ -2311,7 +2418,10 @@ function App() {
             isLoggedIn && userRole === 'librarian' ? (
               <BorrowRecordsPage
                 requests={requests}
+                notice={notice}
+                noticeTone={noticeTone}
                 handleApprove={handleApprove}
+                handleReject={handleRejectRequest}
                 handleReturnRequest={handleReturnRequest}
                 handleApproveReturn={handleApproveReturn}
                 onLogout={handleLogout}
@@ -2337,7 +2447,7 @@ function App() {
           path="/returns"
           element={
             isLoggedIn && userRole === 'librarian' ? (
-              <ReturnsPage requests={requests} handleApproveReturn={handleApproveReturn} onLogout={handleLogout} />
+              <ReturnsPage requests={requests} handleApproveReturn={handleApproveReturn} notice={notice} noticeTone={noticeTone} onLogout={handleLogout} />
             ) : (
               <Navigate to="/login" replace />
             )

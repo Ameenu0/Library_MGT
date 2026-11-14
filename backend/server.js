@@ -41,6 +41,9 @@
 //  BORROWING LIFE CYCLE (the status stored in the requests table)
 //    pending -> approved -> return_requested -> returned
 //    (student asks) (librarian OKs) (student brings it back) (librarian confirms)
+//   A pending request can also end early:
+//    pending -> rejected    (the librarian refuses it)
+//    pending -> cancelled   (the student withdraws it)
 
 require('dotenv').config();
 
@@ -257,6 +260,7 @@ const serialiseRequestRow = (row) => ({
 
 // Works out a book's current state from its request history. Returns one of:
 //   'available' | 'pending' | 'approved' | 'return_requested' | 'returned'
+// A latest request that is 'rejected' or 'cancelled' falls through to 'available': the book is free to request again.
 // Requests may store the book as its id OR its accession number, so all forms are matched.
 const getBookRequestStatus = async (book) => {
   const bookId = book?.id;
@@ -715,6 +719,11 @@ app.post('/api/books', async (req, res) => {
 //   2. PATCH /api/requests/:id/approve        librarian approves             -> 'approved'  (book becomes unavailable, due date set)
 //   3. PATCH /api/requests/:id/return         student says they returned it  -> 'return_requested'
 //   4. PATCH /api/requests/:id/approve-return librarian confirms             -> 'returned'  (book becomes available again)
+//
+// A request that is still 'pending' can be closed early instead of approved:
+//   5. PATCH /api/requests/:id/reject         librarian refuses              -> 'rejected'  (book can be requested again)
+//   6. PATCH /api/requests/:id/cancel         student withdraws own request  -> 'cancelled' (book can be requested again)
+// 'rejected' and 'cancelled' are final. They do not count against the student's borrow limit.
 // GET /api/requests  ->  200 [ every request, newest first ]  (used by the dashboards to show pending / active / returned loans).
 app.get('/api/requests', async (req, res) => {
   try {
@@ -848,7 +857,8 @@ app.post('/api/requests', async (req, res) => {
 
 // PATCH /api/requests/:id/approve   (librarian approves a pending request)
 // Effects: status -> 'approved', approval time and due date saved, the book is marked unavailable.
-// Success: 200 { the updated request }      Errors: 400 student is at their borrow limit, 404 request not found
+// Success: 200 { the updated request }
+// Errors:  400 the request is not pending, or the student is at their borrow limit; 404 request not found
 app.patch('/api/requests/:id/approve', async (req, res) => {
   try {
     const requestRow = await get('SELECT * FROM requests WHERE id = ?', [req.params.id]);
@@ -860,6 +870,14 @@ app.patch('/api/requests/:id/approve', async (req, res) => {
     // Already approved: just return it unchanged, so pressing the button twice does no harm.
     if (String(requestRow.status).toLowerCase() === 'approved') {
       return res.status(200).json(serialiseRequestRow(requestRow));
+    }
+
+    // Only a pending request can be approved. This also stops a request that was rejected, cancelled by the student,
+    // or already returned from being brought back to life by a librarian whose list on screen is out of date.
+    if (String(requestRow.status).toLowerCase() !== 'pending') {
+      return res.status(400).json({
+        message: `Only pending requests can be approved (this request is ${String(requestRow.status).toLowerCase()}).`,
+      });
     }
 
     // Re-check the borrow limit, this time counting loans that are already approved.
@@ -969,6 +987,95 @@ app.patch('/api/requests/:id/approve-return', async (req, res) => {
     return res.status(200).json(serialiseRequestRow(updatedRequest));
   } catch (error) {
     return res.status(500).json({ message: 'Failed to approve return', error: error.message });
+  }
+});
+
+// PATCH /api/requests/:id/reject   (librarian refuses a pending request)
+// Effects: status -> 'rejected'. The request stops counting against the student's borrow limit and the book can be requested again.
+// Success: 200 { the updated request }
+// Errors:  400 only a pending request can be rejected, 404 request not found
+app.patch('/api/requests/:id/reject', async (req, res) => {
+  try {
+    const requestRow = await get('SELECT * FROM requests WHERE id = ?', [req.params.id]);
+
+    if (!requestRow) {
+      return res.status(404).json({ message: 'Request not found' });
+    }
+
+    const currentStatus = String(requestRow.status).toLowerCase();
+
+    // Already rejected: return it unchanged (safe to press twice).
+    if (currentStatus === 'rejected') {
+      return res.status(200).json(serialiseRequestRow(requestRow));
+    }
+
+    // Only a request that is still waiting for a decision can be rejected.
+    // A loan that was already approved must go through the return process instead.
+    if (currentStatus !== 'pending') {
+      return res.status(400).json({ message: `Only pending requests can be rejected (this request is ${currentStatus}).` });
+    }
+
+    await run(`UPDATE requests SET status = 'rejected' WHERE id = ?`, [req.params.id]);
+
+    const updatedRequest = await get('SELECT * FROM requests WHERE id = ?', [req.params.id]);
+    return res.status(200).json(serialiseRequestRow(updatedRequest));
+  } catch (error) {
+    return res.status(500).json({ message: 'Failed to reject request', error: error.message });
+  }
+});
+
+// PATCH /api/requests/:id/cancel   (a student withdraws their OWN pending request)
+// Body:    { studentId }   the student's registration number (or id). It must match the student who made the request.
+// Effects: status -> 'cancelled'. The request stops counting against the borrow limit and the book can be requested again.
+// Success: 200 { the updated request }
+// Errors:  400 studentId missing or the request is not pending, 403 it belongs to another student, 404 request not found
+app.patch('/api/requests/:id/cancel', async (req, res) => {
+  try {
+    const { studentId } = req.body || {};
+
+    if (!studentId) {
+      return res.status(400).json({ message: 'studentId is required to cancel a request' });
+    }
+
+    const requestRow = await get('SELECT * FROM requests WHERE id = ?', [req.params.id]);
+
+    if (!requestRow) {
+      return res.status(404).json({ message: 'Request not found' });
+    }
+
+    // Ownership check: the student named in the body must be the student who made the request.
+    // The request may store the student's id OR registration number, so compare the raw text first, then the resolved student rows.
+    const sameText = String(requestRow.studentId).trim().toUpperCase() === String(studentId).trim().toUpperCase();
+    let sameStudent = sameText;
+
+    if (!sameStudent) {
+      const requester = await getStudentByIdentifier(requestRow.studentId);
+      const caller = await getStudentByIdentifier(studentId);
+      sameStudent = Boolean(requester && caller && requester.id === caller.id);
+    }
+
+    if (!sameStudent) {
+      return res.status(403).json({ message: 'You can only cancel your own requests.' });
+    }
+
+    const currentStatus = String(requestRow.status).toLowerCase();
+
+    // Already cancelled: return it unchanged (safe to press twice).
+    if (currentStatus === 'cancelled') {
+      return res.status(200).json(serialiseRequestRow(requestRow));
+    }
+
+    // Only a pending request can be withdrawn. A book the student already holds must be returned, not cancelled.
+    if (currentStatus !== 'pending') {
+      return res.status(400).json({ message: `Only pending requests can be cancelled (this request is ${currentStatus}).` });
+    }
+
+    await run(`UPDATE requests SET status = 'cancelled' WHERE id = ?`, [req.params.id]);
+
+    const updatedRequest = await get('SELECT * FROM requests WHERE id = ?', [req.params.id]);
+    return res.status(200).json(serialiseRequestRow(updatedRequest));
+  } catch (error) {
+    return res.status(500).json({ message: 'Failed to cancel request', error: error.message });
   }
 });
 
