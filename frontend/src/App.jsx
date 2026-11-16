@@ -157,6 +157,8 @@ function SectionHeader({ title, subtitle }) {
 //        role ('librarian' | 'admin' | 'student', decides which menu links appear), requests (used for the red badges).
 function AppShell({ children, isLoggedIn, onLogout, showNav = true, role = 'librarian', requests = [] }) {
   // Red number badges on the menu: how many requests wait for approval, and how many returns wait for confirmation.
+  // IMPORTANT: the badges are calculated from the `requests` prop, so EVERY staff page must pass
+  // requests={requests} to <AppShell>, otherwise the badges disappear on that page.
   const pendingBorrowRequestCount = requests.filter((request) => request.status === 'pending').length
   const pendingReturnRequestCount = requests.filter((request) => request.status === 'return_requested').length
 
@@ -1178,7 +1180,7 @@ function StudentsPage({ students, books, requests, studentForm, handleStudentCha
   }
 
   return (
-    <AppShell isLoggedIn={true} onLogout={onLogout}>
+    <AppShell isLoggedIn={true} onLogout={onLogout} requests={requests}>
       {/* REGISTRATION FORM: registration number, name, faculty, department, category (and optional password). Validated, then sent to the API. */}
       <section className="panel form-panel">
         <SectionHeader title="Student Registration" />
@@ -1205,7 +1207,7 @@ function StudentsPage({ students, books, requests, studentForm, handleStudentCha
                 name="fullName"
                 value={studentForm.fullName}
                 onChange={handleStudentChange}
-                placeholder="Full Name"
+                placeholder="Jane Doe"
               />
             </label>
           </div>
@@ -1324,7 +1326,7 @@ function StudentsPage({ students, books, requests, studentForm, handleStudentCha
 // LIBRARY INVENTORY (/admin-books), admin only
 // Search box, the "Add Book" form (handleBookSubmit) and the list of all books with their availability.
 // BooksPage below is the same screen for librarians (/books).
-function AdminInventoryPage({ books, bookForm, searchTerm, setSearchTerm, handleBookChange, handleBookSubmit, onLogout, notice, noticeTone }) {
+function AdminInventoryPage({ books, requests, bookForm, searchTerm, setSearchTerm, handleBookChange, handleBookSubmit, onLogout, notice, noticeTone }) {
   // Search over title, author, call number and accession number. With an empty search box ALL books are shown.
   const filteredBooks = useMemo(() => {
     const query = searchTerm.trim().toLowerCase()
@@ -1337,7 +1339,7 @@ function AdminInventoryPage({ books, bookForm, searchTerm, setSearchTerm, handle
   }, [books, searchTerm])
 
   return (
-    <AppShell isLoggedIn={true} onLogout={onLogout} role="admin">
+    <AppShell isLoggedIn={true} onLogout={onLogout} role="admin" requests={requests}>
       {/* LIBRARY INVENTORY: search toolbar, the add-book form and the list of all books. */}
       <section className="panel catalog-panel">
         <SectionHeader title="Library Inventory" />
@@ -1446,7 +1448,7 @@ function AdminInventoryPage({ books, bookForm, searchTerm, setSearchTerm, handle
 }
 
 // BOOK CATALOG (/books), librarian only. Same layout and behaviour as AdminInventoryPage above.
-function BooksPage({ books, bookForm, searchTerm, setSearchTerm, handleBookChange, handleBookSubmit, onLogout, notice, noticeTone }) {
+function BooksPage({ books, requests, bookForm, searchTerm, setSearchTerm, handleBookChange, handleBookSubmit, onLogout, notice, noticeTone }) {
   // Search over title, author, call number and accession number (empty search shows everything).
   const filteredBooks = useMemo(() => {
     const query = searchTerm.trim().toLowerCase()
@@ -1459,7 +1461,7 @@ function BooksPage({ books, bookForm, searchTerm, setSearchTerm, handleBookChang
   }, [books, searchTerm])
 
   return (
-    <AppShell isLoggedIn={true} onLogout={onLogout}>
+    <AppShell isLoggedIn={true} onLogout={onLogout} requests={requests}>
       {/* BOOK CATALOG: search toolbar, the add-book form and the list of all books. */}
       <section className="panel catalog-panel">
         <SectionHeader title="Book Catalog" />
@@ -2362,6 +2364,7 @@ function App() {
             isLoggedIn && userRole === 'admin' ? (
               <AdminInventoryPage
                 books={books}
+                requests={requests}
                 bookForm={bookForm}
                 searchTerm={searchTerm}
                 setSearchTerm={setSearchTerm}
@@ -2383,6 +2386,7 @@ function App() {
             isLoggedIn && userRole === 'librarian' ? (
               <BooksPage
                 books={books}
+                requests={requests}
                 bookForm={bookForm}
                 searchTerm={searchTerm}
                 setSearchTerm={setSearchTerm}
