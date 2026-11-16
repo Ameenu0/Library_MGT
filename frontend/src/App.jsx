@@ -1205,7 +1205,7 @@ function StudentsPage({ students, books, requests, studentForm, handleStudentCha
                 name="fullName"
                 value={studentForm.fullName}
                 onChange={handleStudentChange}
-                placeholder="Jane Doe"
+                placeholder="Full Name"
               />
             </label>
           </div>
